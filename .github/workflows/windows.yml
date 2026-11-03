@@ -44,7 +44,7 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/git/db
             target
-          key: windows-msvc-rust1.93-nodebug-${{ hashFiles('Cargo.lock', '.cargo/config.toml', 'vendor/zed-source.json', 'scripts/patch_editor_baseline.py') }}
+          key: windows-msvc-rust1.93-nodebug-${{ hashFiles('Cargo.lock', '.cargo/config.toml', 'vendor/zed-source.json', 'scripts/patch_*.py') }}
           restore-keys: windows-msvc-rust1.93-nodebug-
       - name: Prepare public editor source and MSVC
         timeout-minutes: 10

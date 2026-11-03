@@ -4,6 +4,7 @@ No upstream workspace is initialized by altaed. Signature help uses the native
 editor popover through a provider, just as completion already does upstream.
 """
 from pathlib import Path
+from patch_windows_shaders import apply as patch_windows_shaders
 
 
 def replace_once(path: Path, before: str, after: str):
@@ -16,6 +17,7 @@ def replace_once(path: Path, before: str, after: str):
 
 
 def apply(snapshot: Path):
+    patch_windows_shaders(snapshot, replace_once)
     editor = snapshot / "crates/editor/src/editor.rs"
     replace_once(editor,
         "    completion_provider: Option<Rc<dyn CompletionProvider>>,",
