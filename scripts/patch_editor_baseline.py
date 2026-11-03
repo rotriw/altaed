@@ -8,6 +8,10 @@ from patch_windows_resources import apply as patch_windows_resources
 
 
 def replace_once(path: Path, before: str, after: str):
+    # An output that is a substring of the input cannot identify an applied
+    # patch (e.g. D3DCompile also matches D3DCompileFromFile). Require delimiters.
+    if after in before:
+        raise ValueError("Patch output must not be a substring of its input")
     source = path.read_text(encoding="utf-8")
     if after in source:
         return

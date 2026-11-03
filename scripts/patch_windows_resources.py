@@ -14,7 +14,9 @@ def apply(snapshot: Path, replace_once):
 [target.'cfg(target_os = "windows")'.dependencies]
 rust-embed = { workspace = true, features = ["debug-embed"] }""")
     renderer = snapshot / "crates/gpui_windows/src/directx_renderer.rs"
-    replace_once(renderer, "D3DCOMPILE_SKIP_OPTIMIZATION, D3DCompileFromFile", "D3DCOMPILE_SKIP_OPTIMIZATION, D3DCompile")
+    replace_once(renderer,
+        "Fxc::{D3DCOMPILE_DEBUG, D3DCOMPILE_SKIP_OPTIMIZATION, D3DCompileFromFile},",
+        "Fxc::{D3DCOMPILE_DEBUG, D3DCOMPILE_SKIP_OPTIMIZATION, D3DCompile},")
     replace_once(renderer, "core::{HSTRING, PCSTR},", "core::PCSTR,")
     replace_once(renderer, '''            use windows::Win32::Graphics::{
                 Direct3D::ID3DInclude, Hlsl::D3D_COMPILE_STANDARD_FILE_INCLUDE,

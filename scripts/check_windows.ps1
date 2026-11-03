@@ -31,6 +31,8 @@ try {
     $evidence = Join-Path $projectRoot 'evidence/windows'
     New-Item -ItemType Directory -Force $evidence | Out-Null
     if ($Stage -in @('all', 'prepare')) {
+        & python -X utf8 scripts/test_editor_patches.py
+        if ($LASTEXITCODE -ne 0) { throw 'Editor patch regression failed.' }
         $prepareArgs = @('scripts/prepare_app.py')
         if ($ZedSource) { $prepareArgs += @('--source', $ZedSource) }
         & python -X utf8 @prepareArgs
