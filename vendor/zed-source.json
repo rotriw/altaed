@@ -1,5 +1,5 @@
 {
   "repository": "https://github.com/zed-industries/zed.git",
-  "revision": "b0f54757a0f83bb5be0e66800b71c32a47065533",
+  "revision": "cabf189854083b8e8531e9476d531e0fc68f8e3d",
   "patch": "scripts/patch_editor_baseline.py"
 }

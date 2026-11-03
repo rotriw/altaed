@@ -14,6 +14,7 @@ import tempfile
 
 from patch_editor_baseline import apply as patch_editor
 
+FETCH_TIMEOUT_SECONDS = 180
 
 def git(source, *arguments):
     return subprocess.check_output(["git", "-C", str(source), *arguments])
@@ -38,7 +39,8 @@ def prepare(project: Path, source: Path | None = None) -> Path:
             source = staging / "checkout"
             source.mkdir()
             subprocess.run(["git", "init", "--quiet", str(source)], check=True)
-            subprocess.run(["git", "-C", str(source), "fetch", "--depth=1", specification["repository"], revision], check=True)
+            subprocess.run(["git", "-C", str(source), "fetch", "--depth=1", specification["repository"], revision],
+                check=True, timeout=FETCH_TIMEOUT_SECONDS)
         actual = git(source, "rev-parse", "--verify", f"{revision}^{{commit}}").decode().strip()
         if actual != revision:
             raise RuntimeError("Source revision does not match vendor/zed-source.json")

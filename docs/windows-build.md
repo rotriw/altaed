@@ -39,7 +39,7 @@ rustup target add x86_64-pc-windows-msvc --toolchain 1.93
 ./scripts/check_windows.ps1 -ZedSource <本地Zed源码目录> -Architecture x86_64 -Release
 ```
 
-脚本验证 MSVC 关键工具，固定 Zed revision `b0f54757a0f83bb5be0e66800b71c32a47065533`，应用可重复的编辑器 provider 扩展，在同一 workspace 执行 check/test/build/Clippy 与真实 clangd 探针。日志写入 `evidence/windows/`。`-Offline` 仅适用于依赖已缓存的构建机。仓库另提供 `.github/workflows/windows.yml`，在 Windows Server 2022/MSVC 环境手动执行；仅 workflow_dispatch 触发，不随首次推送自动运行，尚无远端成功记录。脚本支持选择 aarch64，但此架构和对应工具链组合尚未验证，不是已承诺的发行目标。
+脚本验证 MSVC 关键工具，固定 Zed revision `cabf189854083b8e8531e9476d531e0fc68f8e3d`，应用可重复的编辑器 provider 扩展，在同一 workspace 执行 check/test/build/Clippy 与真实 clangd 探针。日志写入 `evidence/windows/`。`-Offline` 仅适用于依赖已缓存的构建机。仓库另提供 `.github/workflows/windows.yml`，在 Windows Server 2022/MSVC 环境手动执行；仅 workflow_dispatch 触发，不随首次推送自动运行，尚无远端成功记录。脚本支持选择 aarch64，但此架构和对应工具链组合尚未验证，不是已承诺的发行目标。
 
 ## Mac 可执行的有限检查
 
