@@ -21,12 +21,12 @@ def git(source, *arguments):
 
 
 def prepare(project: Path, source: Path | None = None) -> Path:
-    specification = json.loads((project / "vendor/zed-source.json").read_text())
+    specification = json.loads((project / "vendor/zed-source.json").read_text(encoding="utf-8"))
     revision = specification["revision"]
     destination = project / "vendor/zed"
     marker = destination / ".altaed-source-commit"
     if destination.exists():
-        if not marker.is_file() or marker.read_text().strip() != revision:
+        if not marker.is_file() or marker.read_text(encoding="utf-8").strip() != revision:
             raise RuntimeError(f"Refusing to overwrite unverified source: {destination}")
         patch_editor(destination)
         return destination
@@ -49,7 +49,7 @@ def prepare(project: Path, source: Path | None = None) -> Path:
         extracted.mkdir()
         with tarfile.open(fileobj=io.BytesIO(archive)) as files:
             files.extractall(extracted, filter="data")
-        (extracted / marker.name).write_text(revision + "\n")
+        (extracted / marker.name).write_text(revision + "\n", encoding="utf-8", newline="\n")
         patch_editor(extracted)
         # Only publish a fully extracted, successfully patched source tree.
         extracted.rename(destination)

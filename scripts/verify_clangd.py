@@ -110,7 +110,7 @@ def main():
                 "function_completion": function, "resolve_supported": can_resolve, "documentation": resolved.get("documentation"),
                 "signature_help": signature, "member_snippet": push}
             args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n")
+            args.output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
             print("Real clangd: Unicode completion, documentation, second-parameter signature and member snippet passed.")
         finally:
             process.terminate()

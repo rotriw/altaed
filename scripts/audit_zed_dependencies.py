@@ -42,7 +42,7 @@ def read_manifests(source: Path, revision: str | None) -> tuple[dict, str]:
     for directory in ("crates", "tooling", "extensions"):
         paths.extend(sorted((source / directory).rglob("Cargo.toml")))
     return {
-        path.relative_to(source).as_posix(): tomllib.loads(path.read_text())
+        path.relative_to(source).as_posix(): tomllib.loads(path.read_text(encoding="utf-8"))
         for path in paths
     }, "working-tree"
 
@@ -126,7 +126,7 @@ def main():
     }
     serialized = json.dumps(result, indent=2, ensure_ascii=False) + "\n"
     if args.output:
-        args.output.write_text(serialized)
+        args.output.write_text(serialized, encoding="utf-8", newline="\n")
     else:
         print(serialized, end="")
 

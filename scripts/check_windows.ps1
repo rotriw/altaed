@@ -16,7 +16,7 @@ try {
     }
     $prepareArgs = @('scripts/prepare_app.py')
     if ($ZedSource) { $prepareArgs += @('--source', $ZedSource) }
-    $manifest = & python @prepareArgs
+    $manifest = & python -X utf8 @prepareArgs
     if ($LASTEXITCODE -ne 0) { throw 'Pinned editor preparation failed.' }
     $manifest = ($manifest | Select-Object -Last 1).Trim()
     $evidence = Join-Path $projectRoot 'evidence/windows'
@@ -34,7 +34,7 @@ try {
     }
     & cargo +1.93 clippy --workspace @cargoArgs --all-targets --no-deps -- -D warnings *> (Join-Path $evidence 'clippy.log')
     if ($LASTEXITCODE -ne 0) { throw 'Clippy failed; see evidence/windows/clippy.log' }
-    & python scripts/verify_clangd.py --output (Join-Path $evidence 'clangd.json')
+    & python -X utf8 scripts/verify_clangd.py --output (Join-Path $evidence 'clangd.json')
     if ($LASTEXITCODE -ne 0) { throw 'Real clangd probe failed.' }
     if ($Release) {
         & cargo +1.93 build -p altaed @cargoArgs --release *> (Join-Path $evidence 'release.log')

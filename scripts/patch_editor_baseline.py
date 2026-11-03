@@ -7,12 +7,12 @@ from pathlib import Path
 
 
 def replace_once(path: Path, before: str, after: str):
-    source = path.read_text()
+    source = path.read_text(encoding="utf-8")
     if after in source:
         return
     if source.count(before) != 1:
         raise RuntimeError(f"Pinned editor extension no longer applies: {path}")
-    path.write_text(source.replace(before, after, 1))
+    path.write_text(source.replace(before, after, 1), encoding="utf-8", newline="\n")
 
 
 def apply(snapshot: Path):
