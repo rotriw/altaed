@@ -1,4 +1,4 @@
-"""Keep GPUI's debug shaders portable outside the build machine.
+"""Keep Windows debug resources portable outside the build machine.
 
 The pinned upstream compiles debug HLSL from an absolute checkout path at
 runtime. Embed both entry sources and their shared header instead; release
@@ -8,6 +8,11 @@ from pathlib import Path
 
 
 def apply(snapshot: Path, replace_once):
+    replace_once(snapshot / "crates/assets/Cargo.toml", "rust-embed.workspace = true", """rust-embed.workspace = true
+
+# Windows development artifacts are distributed outside the source checkout.
+[target.'cfg(target_os = "windows")'.dependencies]
+rust-embed = { workspace = true, features = ["debug-embed"] }""")
     renderer = snapshot / "crates/gpui_windows/src/directx_renderer.rs"
     replace_once(renderer, "D3DCOMPILE_SKIP_OPTIMIZATION, D3DCompileFromFile", "D3DCOMPILE_SKIP_OPTIMIZATION, D3DCompile")
     replace_once(renderer, "core::{HSTRING, PCSTR},", "core::PCSTR,")
