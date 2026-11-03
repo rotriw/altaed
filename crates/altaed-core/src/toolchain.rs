@@ -308,7 +308,6 @@ mod tests {
         assert_eq!(capabilities.path, compiler);
         assert!(!capabilities.version.is_empty());
         assert!(capabilities.standards.contains(&CppStandard::Default));
-        assert!(capabilities.standards.contains(&CppStandard::Cpp98));
         assert_eq!(fs::read_dir(&root)?.count(), 0);
         assert!(
             verify_compiler(
@@ -318,7 +317,42 @@ mod tests {
             )
             .is_err()
         );
-        fs::remove_dir(root)?;
+        // A frontend flag may exist while its standard library rejects that
+        // mode (notably C++98 with the MSVC STL). Every advertised mode must
+        // work through the document runner, not merely match a platform list.
+        for standard in capabilities.standards {
+            let mut document = crate::document::CodeDocument::untitled();
+            document.text =
+                "#include <iostream>\nint main() { std::cout << \"capability\"; }\n".into();
+            document.metadata.settings.compiler_path = Some(compiler.clone());
+            document.metadata.settings.cpp_standard = standard;
+            document.metadata.tests.push(crate::document::TestCase {
+                expected_output: Some("capability".into()),
+                ..Default::default()
+            });
+            let report = crate::runner::execute(
+                document,
+                crate::runner::RunMode::Test(0),
+                &root.join("runs"),
+                Arc::new(AtomicBool::new(false)),
+                None,
+            )?;
+            assert!(
+                report.compile.status.success(),
+                "advertised {} failed to compile: {}",
+                standard.label(),
+                String::from_utf8_lossy(&report.compile.stderr)
+            );
+            assert!(
+                matches!(
+                    report.cases.first().map(|case| &case.verdict),
+                    Some(crate::runner::Verdict::Passed)
+                ),
+                "advertised {} failed to run",
+                standard.label()
+            );
+        }
+        fs::remove_dir_all(root)?;
         Ok(())
     }
 }

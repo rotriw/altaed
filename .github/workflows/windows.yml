@@ -55,6 +55,7 @@ jobs:
         shell: pwsh
         run: ./scripts/check_windows.ps1 -Stage test
       - name: Build development executable
+        id: development
         timeout-minutes: 20
         shell: pwsh
         run: ./scripts/check_windows.ps1 -Stage build
@@ -63,11 +64,13 @@ jobs:
         shell: pwsh
         run: ./scripts/check_windows.ps1 -Stage probe
       - name: Build release executable
+        id: release
         if: ${{ inputs.release }}
         timeout-minutes: 45
         shell: pwsh
         run: ./scripts/check_windows.ps1 -Stage release
       - name: Package portable release
+        id: portable-package
         if: ${{ inputs.release }}
         shell: pwsh
         run: |
@@ -79,7 +82,7 @@ jobs:
         shell: pwsh
         run: ./scripts/smoke_windows.ps1 -Executable dist/windows/altaed-windows-x86_64/altaed.exe
       - name: Upload portable delivery
-        if: ${{ always() && inputs.release }}
+        if: ${{ always() && inputs.release && steps.portable-package.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: altaed-windows-x86_64
@@ -88,16 +91,22 @@ jobs:
             dist/windows/*.zip
             dist/windows/*.sha256
           if-no-files-found: warn
-      - name: Save logs and development executable
-        if: always()
+      - name: Upload newly built development executable
+        if: ${{ steps.development.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: altaed-windows-development
           retention-days: 14
+          path: target/x86_64-pc-windows-msvc/debug/altaed.exe
+          if-no-files-found: error
+      - name: Save diagnostics and notices
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: altaed-windows-diagnostics
+          retention-days: 14
           path: |
             evidence/windows/
-            target/x86_64-pc-windows-msvc/debug/altaed.exe
-            target/x86_64-pc-windows-msvc/release/altaed.exe
             THIRD_PARTY_NOTICES.md
             crates/altaed/languages/LICENSE-GPL
             crates/altaed/assets/LICENSE-IBM-PLEX.txt
