@@ -1,0 +1,266 @@
+[
+  {
+    "id": "file.new",
+    "label": "新建文档",
+    "action": "altaed::NewDocument",
+    "context": null,
+    "macos": "cmd-n",
+    "other": "ctrl-n"
+  },
+  {
+    "id": "file.open",
+    "label": "打开文件",
+    "action": "altaed::OpenDocument",
+    "context": null,
+    "macos": "cmd-o",
+    "other": "ctrl-o"
+  },
+  {
+    "id": "file.save",
+    "label": "保存文档",
+    "action": "altaed::SaveDocument",
+    "context": null,
+    "macos": "cmd-s",
+    "other": "ctrl-s"
+  },
+  {
+    "id": "file.save_as",
+    "label": "另存为",
+    "action": "altaed::SaveAs",
+    "context": null,
+    "macos": "cmd-shift-s",
+    "other": "ctrl-shift-s"
+  },
+  {
+    "id": "file.close",
+    "label": "关闭文档",
+    "action": "altaed::CloseDocument",
+    "context": null,
+    "macos": "cmd-w",
+    "other": "ctrl-w"
+  },
+  {
+    "id": "app.settings",
+    "label": "软件设置",
+    "action": "altaed::OpenSettings",
+    "context": null,
+    "macos": "cmd-,",
+    "other": "ctrl-,"
+  },
+  {
+    "id": "app.reload_config",
+    "label": "重新载入配置",
+    "action": "altaed::ReloadConfiguration",
+    "context": null,
+    "macos": "",
+    "other": ""
+  },
+  {
+    "id": "app.reveal_config",
+    "label": "显示配置文件",
+    "action": "altaed::RevealConfiguration",
+    "context": null,
+    "macos": "",
+    "other": ""
+  },
+  {
+    "id": "app.quit",
+    "label": "退出软件",
+    "action": "altaed::Quit",
+    "context": null,
+    "macos": "cmd-q",
+    "other": "ctrl-q"
+  },
+  {
+    "id": "run.compile",
+    "label": "编译代码",
+    "action": "altaed::CompileDocument",
+    "context": null,
+    "macos": "cmd-shift-b",
+    "other": "ctrl-shift-b"
+  },
+  {
+    "id": "run.run",
+    "label": "运行已有程序",
+    "action": "altaed::RunCompiled",
+    "context": null,
+    "macos": "f5",
+    "other": "f5"
+  },
+  {
+    "id": "run.tests",
+    "label": "运行测试",
+    "action": "altaed::RunTests",
+    "context": null,
+    "macos": "cmd-r",
+    "other": "ctrl-r"
+  },
+  {
+    "id": "run.compile_and_run",
+    "label": "编译并运行",
+    "action": "altaed::CompileAndRun",
+    "context": null,
+    "macos": "cmd-shift-r",
+    "other": "ctrl-shift-r"
+  },
+  {
+    "id": "run.cancel",
+    "label": "停止编译或测试",
+    "action": "altaed::CancelRun",
+    "context": null,
+    "macos": "",
+    "other": ""
+  },
+  {
+    "id": "run.configure",
+    "label": "文档运行配置",
+    "action": "altaed::ConfigureRun",
+    "context": null,
+    "macos": "",
+    "other": ""
+  },
+  {
+    "id": "tests.add",
+    "label": "添加测试用例",
+    "action": "altaed::AddTest",
+    "context": null,
+    "macos": "",
+    "other": ""
+  },
+  {
+    "id": "view.documents",
+    "label": "切换文档侧栏",
+    "action": "altaed::ToggleDocuments",
+    "context": null,
+    "macos": "cmd-b",
+    "other": "ctrl-b"
+  },
+  {
+    "id": "view.output",
+    "label": "切换底部输出",
+    "action": "altaed::ToggleOutput",
+    "context": null,
+    "macos": "cmd-j",
+    "other": "ctrl-j"
+  },
+  {
+    "id": "view.tests",
+    "label": "切换右侧面板",
+    "action": "altaed::ToggleContext",
+    "context": null,
+    "macos": "cmd-alt-b",
+    "other": "ctrl-alt-b"
+  },
+  {
+    "id": "edit.undo",
+    "label": "撤销",
+    "action": "editor::Undo",
+    "context": "Editor",
+    "macos": "cmd-z",
+    "other": "ctrl-z"
+  },
+  {
+    "id": "edit.redo",
+    "label": "重做",
+    "action": "editor::Redo",
+    "context": "Editor",
+    "macos": "cmd-shift-z",
+    "other": "ctrl-shift-z"
+  },
+  {
+    "id": "edit.cut",
+    "label": "剪切",
+    "action": "editor::Cut",
+    "context": "Editor",
+    "macos": "cmd-x",
+    "other": "ctrl-x"
+  },
+  {
+    "id": "edit.copy",
+    "label": "复制",
+    "action": "editor::Copy",
+    "context": "Editor",
+    "macos": "cmd-c",
+    "other": "ctrl-c"
+  },
+  {
+    "id": "edit.paste",
+    "label": "粘贴",
+    "action": "editor::Paste",
+    "context": "Editor",
+    "macos": "cmd-v",
+    "other": "ctrl-v"
+  },
+  {
+    "id": "edit.select_all",
+    "label": "全选",
+    "action": "editor::SelectAll",
+    "context": "Editor",
+    "macos": "cmd-a",
+    "other": "ctrl-a"
+  },
+  {
+    "id": "edit.complete",
+    "label": "代码补全",
+    "action": "editor::ShowCompletions",
+    "context": "Editor",
+    "macos": "ctrl-space",
+    "other": "ctrl-space"
+  },
+  {
+    "id": "settings.search",
+    "label": "搜索设置",
+    "action": "altaed_settings::SearchSettings",
+    "context": "AltaedSettings > Editor || AltaedSettings",
+    "macos": "cmd-f",
+    "other": "ctrl-f"
+  },
+  {
+    "id": "settings.close",
+    "label": "关闭设置或清除搜索",
+    "action": "altaed_settings::CloseSettings",
+    "context": "AltaedSettings > Editor || AltaedSettings",
+    "macos": "escape",
+    "other": "escape"
+  },
+  {
+    "id": "input.newline",
+    "label": "多行输入换行",
+    "action": "editor::Newline",
+    "context": "AltaedMultiline > Editor",
+    "macos": "enter",
+    "other": "enter"
+  },
+  {
+    "id": "input.newline_alternate",
+    "label": "多行输入换行（备用）",
+    "action": "editor::Newline",
+    "context": "AltaedMultiline > Editor",
+    "macos": "shift-enter",
+    "other": "shift-enter"
+  },
+  {
+    "id": "edit.definition",
+    "label": "转到定义",
+    "action": "altaed::GoToDefinition",
+    "context": "Editor",
+    "macos": "f12",
+    "other": "f12"
+  },
+  {
+    "id": "lsp.restart",
+    "label": "重新启动语言服务",
+    "action": "altaed::RestartLanguageServer",
+    "context": null,
+    "macos": "",
+    "other": ""
+  },
+  {
+    "id": "edit.signature_help",
+    "label": "函数参数提示",
+    "action": "editor::ShowSignatureHelp",
+    "context": "Editor",
+    "macos": "cmd-shift-space",
+    "other": "ctrl-shift-space"
+  }
+]

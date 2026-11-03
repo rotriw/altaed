@@ -1,0 +1,18 @@
+{
+  "width": 700,
+  "height": 400,
+  "footer": 48,
+  "padding": 48,
+  "control_height": 32,
+  "table_row": 44,
+  "breath_duration_seconds": 12,
+  "wordmark": {
+    "height": 38,
+    "padding": 12,
+    "width": 82.432
+  },
+  "banner_font_size": 176,
+  "banner_bottom": -34,
+  "banner_opacity_min": 0.65,
+  "banner_opacity_max": 0.8
+}

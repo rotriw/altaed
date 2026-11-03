@@ -1,0 +1,57 @@
+name: Windows development build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Also build the release executable (not an installer)
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.93 --profile minimal --component clippy --component rustfmt
+          if ($LASTEXITCODE -ne 0) { throw 'Rust installation failed' }
+          rustup target add x86_64-pc-windows-msvc --toolchain 1.93
+          if ($LASTEXITCODE -ne 0) { throw 'Windows target installation failed' }
+      - name: Configure MSVC and validate workspace
+        shell: pwsh
+        env:
+          ALTAED_BUILD_RELEASE: ${{ inputs.release }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $installation = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if ($LASTEXITCODE -ne 0 -or -not $installation) { throw 'MSVC x64 tools are unavailable' }
+          Import-Module (Join-Path $installation 'Common7/Tools/Microsoft.VisualStudio.DevShell.dll')
+          Enter-VsDevShell -VsInstallPath $installation -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+          $llvmBin = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'LLVM/bin'
+          if (Test-Path -LiteralPath $llvmBin) { $env:PATH = $llvmBin + ';' + $env:PATH }
+          $buildRelease = $env:ALTAED_BUILD_RELEASE -eq 'true'
+          ./scripts/check_windows.ps1 -Architecture x86_64 -Release:$buildRelease
+      - name: Save logs and development executable
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: altaed-windows-development
+          retention-days: 14
+          path: |
+            evidence/windows/
+            target/x86_64-pc-windows-msvc/debug/altaed.exe
+            target/x86_64-pc-windows-msvc/release/altaed.exe
+          if-no-files-found: warn

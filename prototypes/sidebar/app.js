@@ -1,0 +1,3 @@
+const resources=document.querySelector('#resources'), sidebar=document.querySelector('#sidebar');
+resources.addEventListener('click',()=>{sidebar.hidden=!sidebar.hidden;resources.classList.toggle('active',!sidebar.hidden);resources.setAttribute('aria-expanded',String(!sidebar.hidden));});
+document.querySelectorAll('.file').forEach(row=>{const select=()=>{document.querySelectorAll('.file').forEach(file=>file.classList.remove('selected'));row.classList.add('selected');};row.addEventListener('click',select);row.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select();}});});

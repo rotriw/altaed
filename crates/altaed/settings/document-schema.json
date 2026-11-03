@@ -1,0 +1,144 @@
+{
+  "owner": "core",
+  "layout": {
+    "width": 960,
+    "height": 700,
+    "sidebar": 192,
+    "header": 56,
+    "footer": 52,
+    "content_padding": 32,
+    "section_header": 36,
+    "control_height": 36,
+    "multiline_height": 100,
+    "row_gap": 28
+  },
+  "categories": [
+    {
+      "id": "core.compiler",
+      "label": "编译器",
+      "description": "从当前编辑内容编译，无需先保存文件。"
+    },
+    {
+      "id": "core.execution",
+      "label": "运行",
+      "description": "设置本地测试的执行限制。"
+    },
+    {
+      "id": "core.checker",
+      "label": "输出比较",
+      "description": "为这份代码选择合适的答案比较方式。"
+    }
+  ],
+  "settings": [
+    {
+      "id": "core.compiler.path",
+      "category": "core.compiler",
+      "label": "C++ 编译器",
+      "description": "留空时从 PATH 查找 clang++、g++ 或 c++。",
+      "kind": "text",
+      "default": "",
+      "placeholder": "自动查找"
+    },
+    {
+      "id": "core.compiler.arguments",
+      "category": "core.compiler",
+      "label": "编译参数",
+      "description": "每行一个参数，无需添加 shell 引号。",
+      "kind": "multiline",
+      "default": "-std=c++20\n-O2",
+      "placeholder": "每行一个参数"
+    },
+    {
+      "id": "core.compiler.directory",
+      "category": "core.compiler",
+      "label": "工作目录",
+      "description": "留空使用源码所在目录；未保存代码使用应用工作目录。",
+      "kind": "text",
+      "default": "",
+      "placeholder": "源码所在目录"
+    },
+    {
+      "id": "core.execution.compile_timeout",
+      "category": "core.execution",
+      "label": "编译超时",
+      "description": "超过此时间停止本次编译。",
+      "kind": "integer",
+      "unit": "毫秒",
+      "min": 1,
+      "default": "30000",
+      "control_width": 160
+    },
+    {
+      "id": "core.execution.test_timeout",
+      "category": "core.execution",
+      "label": "单例超时",
+      "description": "每个测试用例独立计时，交互终端不使用此限制。",
+      "kind": "integer",
+      "unit": "毫秒",
+      "min": 1,
+      "default": "2000",
+      "control_width": 160
+    },
+    {
+      "id": "core.execution.output_limit",
+      "category": "core.execution",
+      "label": "输出上限",
+      "description": "标准输出与错误输出的合计上限。",
+      "kind": "integer",
+      "unit": "字节",
+      "min": 1,
+      "default": "1048576",
+      "control_width": 160
+    },
+    {
+      "id": "core.checker.mode",
+      "category": "core.checker",
+      "label": "比较方式",
+      "description": "只影响启用“比较预期输出”的测试用例。",
+      "kind": "choice",
+      "default": "tokens",
+      "options": [
+        {
+          "value": "exact",
+          "label": "严格文本"
+        },
+        {
+          "value": "tokens",
+          "label": "忽略空白"
+        },
+        {
+          "value": "float",
+          "label": "浮点数"
+        }
+      ]
+    },
+    {
+      "id": "core.checker.absolute",
+      "category": "core.checker",
+      "label": "绝对误差",
+      "description": "实际值与预期值允许的最大绝对差。",
+      "kind": "decimal",
+      "min": 0,
+      "default": "0.000001",
+      "visible_when": {
+        "id": "core.checker.mode",
+        "value": "float"
+      },
+      "control_width": 160
+    },
+    {
+      "id": "core.checker.relative",
+      "category": "core.checker",
+      "label": "相对误差",
+      "description": "满足绝对误差或相对误差中的任一条件即通过。",
+      "kind": "decimal",
+      "min": 0,
+      "default": "0.000001",
+      "visible_when": {
+        "id": "core.checker.mode",
+        "value": "float"
+      },
+      "control_width": 160
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+# Match the pinned GPUI/Zed Windows ABI flags. Dependency workspace config is
+# not inherited by an external consumer such as altaed.
+[target.'cfg(target_os = "windows")']
+rustflags = [
+    "--cfg", "windows_slim_errors",
+    "-C", "target-feature=+crt-static",
+]

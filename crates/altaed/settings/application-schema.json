@@ -1,0 +1,178 @@
+{
+  "owner": "core",
+  "layout": {
+    "width": 960,
+    "height": 700,
+    "sidebar": 192,
+    "header": 56,
+    "footer": 52,
+    "content_padding": 32,
+    "section_header": 36,
+    "control_height": 36,
+    "multiline_height": 100,
+    "row_gap": 28
+  },
+  "categories": [
+    {
+      "id": "core.editor",
+      "label": "编辑器",
+      "description": "统一设置所有代码编辑器的显示方式。"
+    },
+    {
+      "id": "core.toolchain",
+      "label": "编译环境",
+      "description": "软件默认编译器；文档可单独覆盖。"
+    },
+    {
+      "id": "core.lsp",
+      "label": "语言服务",
+      "description": "配置本地 C++ 语言服务 clangd。"
+    },
+    {
+      "id": "core.workbench",
+      "label": "工作台",
+      "description": "设置应用启动时的面板布局。"
+    }
+  ],
+  "settings": [
+    {
+      "id": "core.editor.font_family",
+      "category": "core.editor",
+      "label": "代码字体",
+      "description": "为所有代码编辑器指定字体。",
+      "kind": "text",
+      "default": "Menlo",
+      "placeholder": "Menlo",
+      "required": true,
+      "control_width": 420
+    },
+    {
+      "id": "core.editor.font_size",
+      "category": "core.editor",
+      "label": "字号",
+      "description": "应用后立即更新已打开的代码编辑器。",
+      "kind": "decimal",
+      "unit": "像素",
+      "min": 8,
+      "max": 40,
+      "default": "14",
+      "control_width": 160
+    },
+    {
+      "id": "core.editor.line_numbers",
+      "category": "core.editor",
+      "label": "显示行号",
+      "description": "在代码左侧显示行号。",
+      "kind": "toggle",
+      "default": true
+    },
+    {
+      "id": "core.editor.soft_wrap",
+      "category": "core.editor",
+      "label": "自动换行",
+      "description": "长行按编辑区宽度折行，不修改文件内容。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
+      "id": "core.editor.auto_signature_help",
+      "category": "core.editor",
+      "label": "自动显示参数提示",
+      "description": "输入函数参数时显示签名，并突出当前参数；也可用快捷键手动打开。",
+      "kind": "toggle",
+      "default": true
+    },
+    {
+      "id": "core.workbench.documents",
+      "category": "core.workbench",
+      "label": "显示文档侧栏",
+      "description": "启动时展开左侧文档列表。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
+      "id": "core.workbench.tests",
+      "category": "core.workbench",
+      "label": "显示测试面板",
+      "description": "启动时展开右侧运行信息与测试数据。",
+      "kind": "toggle",
+      "default": true
+    },
+    {
+      "id": "core.workbench.output",
+      "category": "core.workbench",
+      "label": "显示底部输出",
+      "description": "启动时展开详细编译与运行输出；也可通过“视图”菜单临时切换。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
+      "id": "core.toolchain.compiler_path",
+      "category": "core.toolchain",
+      "label": "默认 C++ 编译器",
+      "description": "未单独指定编译器的文档使用此路径；留空时从 PATH 自动查找。",
+      "kind": "text",
+      "default": "",
+      "placeholder": "自动查找 clang++ / g++ / c++",
+      "control_width": 520
+    },
+    {
+      "id": "core.workbench.reduce_motion",
+      "category": "core.workbench",
+      "label": "减少动画",
+      "description": "关闭欢迎首页的呼吸动画；系统启用减少动态效果时也会关闭。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
+      "id": "core.lsp.enabled",
+      "category": "core.lsp",
+      "label": "启用 C++ 语言服务",
+      "description": "使用本地 clangd 提供补全、诊断和定义跳转。",
+      "kind": "toggle",
+      "default": true
+    },
+    {
+      "id": "core.lsp.path",
+      "category": "core.lsp",
+      "label": "clangd 路径",
+      "description": "留空时从 PATH 查找，未安装时编辑器仍可使用。",
+      "kind": "text",
+      "default": "",
+      "placeholder": "自动查找 clangd",
+      "control_width": 520
+    },
+    {
+      "id": "core.lsp.arguments",
+      "category": "core.lsp",
+      "label": "启动参数",
+      "description": "每行一个参数，无 shell 展开。默认等待语义解析、展开重载并插入参数占位；同名高级参数可覆盖这些默认值。编译数据库由 IDE 管理。",
+      "kind": "multiline",
+      "default": "--background-index\n--header-insertion=never\n--log=error\n--completion-parse=always\n--completion-style=detailed\n--function-arg-placeholders=true"
+    },
+    {
+      "id": "core.lsp.startup_timeout_ms",
+      "category": "core.lsp",
+      "label": "启动超时",
+      "description": "初始化语言服务允许等待的时间。",
+      "kind": "integer",
+      "unit": "毫秒",
+      "min": 1,
+      "default": "15000",
+      "control_width": 160,
+      "max": 300000
+    },
+    {
+      "id": "core.lsp.request_timeout_ms",
+      "category": "core.lsp",
+      "label": "请求超时",
+      "description": "单次补全或跳转请求允许等待的时间。",
+      "kind": "integer",
+      "unit": "毫秒",
+      "min": 1,
+      "default": "5000",
+      "control_width": 160,
+      "max": 300000
+    }
+  ]
+}

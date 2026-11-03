@@ -1,0 +1,19 @@
+**/target/
+.cache/
+**/__pycache__/
+*.pyc
+/vendor/zed/
+/vendor/.zed-*/
+/evidence/
+/experiments/
+/.impeccable/*
+!/.impeccable/design.json
+/.DS_Store
+**/.DS_Store
+**/.idea/
+**/.vscode/
+# Local code documents, sidecars and credentials never belong in source control.
+**/.altaed/
+.env
+.env.*
+!.env.example

@@ -1,0 +1,15 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>altaed · 测试区布局验证</title><link rel="stylesheet" href="style.css"><body>
+<div class="prototype"><span>布局原型 · 结果为演示，源码不执行</span><div><button id="stress">载入 500 例</button><span id="metrics"></span></div></div>
+<header class="window"><strong>altaed</strong><span>solution.cpp</span><nav>文件　编辑　运行　视图</nav></header>
+<div class="workspace"><main><div class="file-tab"><span>solution.cpp</span><div><button data-command="compile">编译</button><button data-command="tests">运行测试</button><button data-command="terminal">交互执行</button></div></div><pre aria-label="代码区示意">#include &lt;iostream&gt;
+
+int main() {
+    long long value;
+    std::cin &gt;&gt; value;
+    std::cout &lt;&lt; value * 2 &lt;&lt; '\n';
+}</pre></main><div id="width-handle" class="handle vertical" role="separator" aria-label="测试区宽度" aria-orientation="vertical" tabindex="0"></div><aside>
+<section id="messages"><div class="heading"><strong>运行信息</strong><button id="clear">清空</button></div><pre id="log">尚未运行。编辑用例后可预览结果。</pre></section><div id="height-handle" class="handle horizontal" role="separator" aria-label="运行信息高度" aria-orientation="horizontal" tabindex="0"></div>
+<div class="test-heading"><strong>测试数据 <span id="count"></span></strong><button id="add">添加用例</button></div>
+<div id="cases" role="region" aria-label="测试用例列表"><div id="empty-tests" hidden><strong>还没有测试用例</strong><p>添加输入和预期输出，即可测试当前代码。</p><button id="add-first">添加第一个用例</button></div><div id="spacer"></div><div id="visible"></div></div>
+<footer><span>忽略空白</span><span>输入与预期输出可编辑 · 实际输出只读</span></footer></aside></div>
+<script src="app.js"></script></body></html>
