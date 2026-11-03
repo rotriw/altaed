@@ -29,7 +29,7 @@ cargo +1.93 test --workspace --locked
 cargo +1.93 clippy --workspace --all-targets --no-deps --locked -- -D warnings
 ```
 
-macOS 需要 Xcode 及 Metal 工具。Windows 完整构建需要 MSVC Build Tools、Windows SDK 和 CMake；用户 C++ 代码使用的 MinGW-w64 是另一套工具链。Windows 共享核心已经通过目标检查，完整 GUI 与发布包尚未验证，详见 [Windows 构建说明](docs/windows-build.md)。首次欢迎页允许暂时跳过 C++ 配置。
+macOS 需要 Xcode 及 Metal 工具。Windows 完整构建需要 MSVC Build Tools、Windows SDK 和 CMake；用户 C++ 代码使用的 MinGW-w64 是另一套工具链。Windows CI 已生成 debug exe，并通过37项测试、Clippy和真实clangd探针；release与真实桌面人工验收尚未完成，详见 [验证记录](docs/windows-validation.md) 和 [构建说明](docs/windows-build.md)。首次欢迎页允许暂时跳过 C++ 配置。
 
 ## 文档
 

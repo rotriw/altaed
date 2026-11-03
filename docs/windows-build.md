@@ -1,6 +1,6 @@
 # Windows 构建与兼容性
 
-当前状态：共享核心通过 `x86_64-pc-windows-msvc` 的交叉编译检查和 Clippy；完整 GPUI 应用还没有 Windows 构建成功或运行通过的证据。此页区分已经修正的代码、构建机要求和未验收事项。
+当前状态：完整 GPUI 应用已经在 Windows CI 生成 debug exe，37项测试、Clippy与真实clangd探针通过；release因总任务超时未完成，真实桌面交互仍待人工验收。详见 [CI验证记录](windows-validation.md)。此页区分已经修正的代码、构建机要求和未验收事项。
 
 ## 两套编译环境
 
