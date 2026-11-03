@@ -12,13 +12,18 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_TARGET_DIR: ${{ github.workspace }}/target
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  CARGO_PROFILE_TEST_DEBUG: '0'
+  CARGO_BUILD_JOBS: '2'
+  PYTHONUTF8: '1'
+  GIT_TERMINAL_PROMPT: '0'
+
 jobs:
   build:
     runs-on: windows-2022
-    timeout-minutes: 90
-    env:
-      CARGO_TARGET_DIR: ${{ github.workspace }}/target
-      PYTHONUTF8: '1'
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -30,21 +35,46 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Rust installation failed' }
           rustup target add x86_64-pc-windows-msvc --toolchain 1.93
           if ($LASTEXITCODE -ne 0) { throw 'Windows target installation failed' }
-      - name: Configure MSVC and validate workspace
+      - name: Restore Cargo dependencies and build cache
+        id: cargo-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: windows-msvc-rust1.93-nodebug-${{ hashFiles('Cargo.lock', '.cargo/config.toml', 'vendor/zed-source.json', 'scripts/patch_editor_baseline.py') }}
+          restore-keys: windows-msvc-rust1.93-nodebug-
+      - name: Prepare public editor source and MSVC
+        timeout-minutes: 10
         shell: pwsh
-        env:
-          ALTAED_BUILD_RELEASE: ${{ inputs.release }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $vswhere = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio/Installer/vswhere.exe'
-          $installation = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-          if ($LASTEXITCODE -ne 0 -or -not $installation) { throw 'MSVC x64 tools are unavailable' }
-          Import-Module (Join-Path $installation 'Common7/Tools/Microsoft.VisualStudio.DevShell.dll')
-          Enter-VsDevShell -VsInstallPath $installation -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
-          $llvmBin = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'LLVM/bin'
-          if (Test-Path -LiteralPath $llvmBin) { $env:PATH = $llvmBin + ';' + $env:PATH }
-          $buildRelease = $env:ALTAED_BUILD_RELEASE -eq 'true'
-          ./scripts/check_windows.ps1 -Architecture x86_64 -Release:$buildRelease
+        run: ./scripts/check_windows.ps1 -Stage prepare
+      - name: Check all crates
+        timeout-minutes: 25
+        shell: pwsh
+        run: ./scripts/check_windows.ps1 -Stage check
+      - name: Run all tests
+        timeout-minutes: 30
+        shell: pwsh
+        run: ./scripts/check_windows.ps1 -Stage test
+      - name: Build development executable
+        timeout-minutes: 20
+        shell: pwsh
+        run: ./scripts/check_windows.ps1 -Stage build
+      - name: Check Clippy
+        timeout-minutes: 15
+        shell: pwsh
+        run: ./scripts/check_windows.ps1 -Stage clippy
+      - name: Probe real clangd
+        timeout-minutes: 5
+        shell: pwsh
+        run: ./scripts/check_windows.ps1 -Stage probe
+      - name: Build release executable
+        if: ${{ inputs.release }}
+        timeout-minutes: 45
+        shell: pwsh
+        run: ./scripts/check_windows.ps1 -Stage release
       - name: Save logs and development executable
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -55,4 +85,17 @@ jobs:
             evidence/windows/
             target/x86_64-pc-windows-msvc/debug/altaed.exe
             target/x86_64-pc-windows-msvc/release/altaed.exe
+            THIRD_PARTY_NOTICES.md
+            crates/altaed/languages/LICENSE-GPL
+            crates/altaed/assets/LICENSE-IBM-PLEX.txt
           if-no-files-found: warn
+      - name: Preserve dependencies for the next attempt
+        if: always() && steps.cargo-cache.outputs.cache-primary-key != '' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
