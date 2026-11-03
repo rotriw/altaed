@@ -26,7 +26,7 @@
 
 ## 构建机与运行命令
 
-项目已整理为根 Cargo workspace；准备脚本不再生成外部消费者，直接准备仓库内 vendor/zed。首个完整验证目标为 **Windows x64 / MSVC**。建议在已有 Visual Studio C++ 构建环境的 Windows 构建机执行；本机的 Windows 11 虚拟机不可用，未再作为验收环境。后续可在 Windows CI 运行同一脚本，目前没有创建远端仓库或触发云端构建。
+项目已整理为根 Cargo workspace；准备脚本不再生成外部消费者，直接准备仓库内 vendor/zed。首个完整验证目标为 **Windows x64 / MSVC**。建议在已有 Visual Studio C++ 构建环境的 Windows 构建机执行；本机的 Windows 11 虚拟机不可用，未再作为验收环境。同一脚本已经在 GitHub Windows CI 执行，已有 debug 产物与行为验证记录。
 
 构建机需有：Git、Python 3.11+、Rust 1.93（含 rustfmt/Clippy 和目标标准库）、MSVC 的 cl/link/lib、Windows 10/11 SDK、CMake。release 的 GPUI 着色器编译还需要 SDK 的 fxc.exe；可以使用 `GPUI_FXC_PATH` 指定。C++ 行为测试及真实语言服务探针还需要可用的 C++20 编译器和 clangd。无需启动 Zed 的数据库、账号、Node 或协作服务。
 
@@ -39,7 +39,7 @@ rustup target add x86_64-pc-windows-msvc --toolchain 1.93
 ./scripts/check_windows.ps1 -ZedSource <本地Zed源码目录> -Architecture x86_64 -Release
 ```
 
-脚本验证 MSVC 关键工具，固定 Zed revision `cabf189854083b8e8531e9476d531e0fc68f8e3d`，应用可重复的编辑器 provider 扩展，在同一 workspace 执行 check/test/build/Clippy 与真实 clangd 探针。日志写入 `evidence/windows/`。`-Offline` 仅适用于依赖已缓存的构建机。仓库另提供 `.github/workflows/windows.yml`，在 Windows Server 2022/MSVC 环境手动执行；仅 workflow_dispatch 触发，不随首次推送自动运行，尚无远端成功记录。脚本支持选择 aarch64，但此架构和对应工具链组合尚未验证，不是已承诺的发行目标。
+脚本验证 MSVC 关键工具，固定 Zed revision `cabf189854083b8e8531e9476d531e0fc68f8e3d`，应用可重复的编辑器 provider 扩展，默认在同一 workspace 执行 test/build 与真实 clangd 探针；不再重复执行 cargo check 或 Clippy。需要专门诊断时仍可显式指定 `-Stage check` 或 `-Stage clippy`。日志写入 `evidence/windows/`。`-Offline` 仅适用于依赖已缓存的构建机。仓库另提供 `.github/workflows/windows.yml`，在 Windows Server 2022/MSVC 环境手动执行；仅 workflow_dispatch 触发，不随推送自动运行；已有阶段通过与产物记录，整条新版流程的结果见 CI 验证记录。脚本支持选择 aarch64，但此架构和对应工具链组合尚未验证，不是已承诺的发行目标。
 
 ## Mac 可执行的有限检查
 

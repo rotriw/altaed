@@ -42,7 +42,11 @@ try {
     $cargoArgs = @('--manifest-path', (Join-Path $projectRoot 'Cargo.toml'), '--locked', '--target', $target)
     if ($Offline) { $cargoArgs += '--offline' }
     foreach ($check in @('check', 'test', 'build', 'clippy')) {
-        if ($Stage -notin @('all', $check)) { continue }
+        # Build and tests already compile the workspace. Keep static checks
+        # available explicitly without repeating them in the default workflow.
+        if ($Stage -eq 'all') {
+            if ($check -notin @('test', 'build')) { continue }
+        } elseif ($Stage -ne $check) { continue }
         Write-Host "::group::cargo $check ($target)"
         $commandArgs = @('+1.93', $check, '--workspace') + $cargoArgs
         if ($check -eq 'clippy') { $commandArgs += @('--all-targets', '--no-deps', '--', '-D', 'warnings') }
