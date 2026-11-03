@@ -1,4 +1,9 @@
 //! Local toolchain discovery and first-run verification, without a UI context.
+mod options;
+mod standard;
+pub use options::{CompilerOptions, Optimization};
+pub use standard::CppStandard;
+
 use crate::runner::{Termination, process};
 use anyhow::{Context, Result, ensure};
 use std::{
@@ -87,9 +92,51 @@ pub(crate) fn runtime_command(executable: &Path, compiler: &Path) -> Result<Comm
     let _ = compiler;
     Ok(command)
 }
-/// Compile and execute a C++20 program with standard-library I/O. A compiler
-/// shim or a missing SDK must not be reported as a usable environment.
-pub fn verify_compiler(path: &Path, root: &Path, cancel: Arc<AtomicBool>) -> Result<PathBuf> {
+/// The copied checker can still locate DLLs beside the imported original.
+/// Keep this platform detail out of checker configuration and UI callbacks.
+pub(crate) fn checker_command(
+    executable: &Path,
+    compiler: &Path,
+    original_directory: &Path,
+) -> Result<Command> {
+    #[allow(unused_mut)]
+    let mut command = runtime_command(executable, compiler)?;
+    #[cfg(target_os = "windows")]
+    {
+        let mut paths = vec![
+            original_directory.to_owned(),
+            compiler
+                .parent()
+                .context("编译器路径没有父目录")?
+                .to_owned(),
+        ];
+        if let Some(search) = std::env::var_os("PATH") {
+            paths.extend(std::env::split_paths(&search));
+        }
+        command.env(
+            "PATH",
+            std::env::join_paths(paths).context("无法设置比较器 DLL 搜索路径")?,
+        );
+    }
+    #[cfg(not(target_os = "windows"))]
+    let _ = original_directory;
+    Ok(command)
+}
+#[derive(Clone, Debug)]
+pub struct CompilerCapabilities {
+    pub path: PathBuf,
+    pub version: String,
+    /// Accepted command-line modes, not a claim of full standard conformance.
+    pub standards: Vec<CppStandard>,
+}
+
+/// Verify standard-library compilation and execution in the driver's default
+/// mode, then probe supported language flags instead of imposing C++20.
+pub fn verify_compiler(
+    path: &Path,
+    root: &Path,
+    cancel: Arc<AtomicBool>,
+) -> Result<CompilerCapabilities> {
     let compiler =
         find_executable(path).context("找不到指定的编译器，请填写完整路径或 PATH 中的命令")?;
     let directory = root.join(Uuid::new_v4().to_string());
@@ -100,7 +147,11 @@ pub fn verify_compiler(path: &Path, root: &Path, cancel: Arc<AtomicBool>) -> Res
     cleanup.context("检测已完成，但临时文件清理失败")?;
     Ok(verified)
 }
-fn verify_in(compiler: &Path, directory: &Path, cancel: &Arc<AtomicBool>) -> Result<PathBuf> {
+fn verify_in(
+    compiler: &Path,
+    directory: &Path,
+    cancel: &Arc<AtomicBool>,
+) -> Result<CompilerCapabilities> {
     let directory = fs::canonicalize(directory)?;
     let source = directory.join("verify.cpp");
     let executable = directory.join(format!("verify{}", std::env::consts::EXE_SUFFIX));
@@ -108,12 +159,29 @@ fn verify_in(compiler: &Path, directory: &Path, cancel: &Arc<AtomicBool>) -> Res
         &source,
         "#include <iostream>\nint main() { std::cout << __cplusplus; }\n",
     )?;
+    let mut version_command = Command::new(compiler);
+    version_command.arg("--version");
+    let version_output = process::execute(
+        version_command,
+        b"",
+        &directory.join("version"),
+        Duration::from_secs(5),
+        65_536,
+        cancel,
+    )?;
+    ensure!(
+        version_output.termination == Termination::Exited && version_output.status.success(),
+        "无法读取编译器版本：{}",
+        String::from_utf8_lossy(&version_output.stderr)
+    );
+    let version = String::from_utf8_lossy(&version_output.stdout)
+        .lines()
+        .next()
+        .filter(|line| !line.trim().is_empty())
+        .context("编译器未返回版本信息")?
+        .to_owned();
     let mut command = Command::new(compiler);
-    command
-        .args(["-std=c++20"])
-        .arg(&source)
-        .arg("-o")
-        .arg(&executable);
+    command.arg(&source).arg("-o").arg(&executable);
     let output = process::execute(
         command,
         b"",
@@ -124,7 +192,7 @@ fn verify_in(compiler: &Path, directory: &Path, cancel: &Arc<AtomicBool>) -> Res
     )?;
     ensure!(
         output.termination == Termination::Exited && output.status.success(),
-        "C++20 编译检测失败（{:?}）：{}",
+        "默认语言模式编译检测失败（{:?}）：{}",
         output.termination,
         String::from_utf8_lossy(&output.stderr)
     );
@@ -142,17 +210,73 @@ fn verify_in(compiler: &Path, directory: &Path, cancel: &Arc<AtomicBool>) -> Res
             && String::from_utf8_lossy(&output.stdout)
                 .trim()
                 .parse::<u64>()
-                .is_ok_and(|version| version >= 202002),
+                .is_ok_and(|version| version >= 199711),
         "程序执行检测失败，请检查工具链和系统运行环境"
     );
     // Keep the selected driver name: resolving a clang++ symlink to clang can
     // change its language/runtime-linking behavior on subsequent invocations.
-    Ok(compiler.to_owned())
+    let mut standards = vec![CppStandard::Default];
+    for standard in CppStandard::ALL
+        .into_iter()
+        .filter(|mode| *mode != CppStandard::Default)
+    {
+        let mut command = Command::new(compiler);
+        command
+            .arg(format!("-std={}", standard.value()))
+            .arg("-fsyntax-only")
+            .arg(&source);
+        let output = process::execute(
+            command,
+            b"",
+            &directory.join(standard.value()),
+            Duration::from_secs(10),
+            65_536,
+            cancel,
+        )?;
+        ensure!(
+            output.termination == Termination::Exited,
+            "C++ 标准选项检测未完成（{:?}）",
+            output.termination
+        );
+        if output.status.success() {
+            standards.push(standard);
+        }
+    }
+    Ok(CompilerCapabilities {
+        path: compiler.to_owned(),
+        version,
+        standards,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn explicit_standard_overrides_only_language_flags_and_legacy_settings_survive() -> Result<()> {
+        let mut settings = crate::document::DocumentSettings::default();
+        settings.compiler_arguments = vec!["-std=c++20".into(), "-O2".into(), "-DVALUE=1".into()];
+        let mut legacy = serde_json::to_value(&settings)?;
+        legacy.as_object_mut().unwrap().remove("cpp_standard");
+        let restored: crate::document::DocumentSettings = serde_json::from_value(legacy)?;
+        assert_eq!(
+            restored.effective_compiler_arguments(),
+            settings.compiler_arguments
+        );
+        settings.cpp_standard = CppStandard::Cpp98;
+        assert_eq!(
+            settings.effective_compiler_arguments(),
+            ["-O2", "-DVALUE=1", "-std=c++98"]
+        );
+        assert_eq!(settings.compiler_arguments[0], "-std=c++20");
+        assert!(
+            !crate::document::DocumentSettings::default()
+                .effective_compiler_arguments()
+                .iter()
+                .any(|argument| argument.starts_with("-std="))
+        );
+        Ok(())
+    }
     #[test]
     fn executable_lookup_accepts_windows_suffix_and_relative_path_entries() -> Result<()> {
         let root = std::env::temp_dir().join(format!("altaed lookup {}", Uuid::new_v4()));
@@ -177,13 +301,14 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn verifies_real_cpp20_environment_and_rejects_missing_driver() -> Result<()> {
+    fn detects_real_compiler_capabilities_and_rejects_missing_driver() -> Result<()> {
         let root = std::env::temp_dir().join(format!("altaed-toolchain-{}", Uuid::new_v4()));
         let compiler = discover_compiler().context("工具链回归需要真实 C++ 编译器")?;
-        assert_eq!(
-            verify_compiler(&compiler, &root, Arc::new(AtomicBool::new(false)))?,
-            compiler
-        );
+        let capabilities = verify_compiler(&compiler, &root, Arc::new(AtomicBool::new(false)))?;
+        assert_eq!(capabilities.path, compiler);
+        assert!(!capabilities.version.is_empty());
+        assert!(capabilities.standards.contains(&CppStandard::Default));
+        assert!(capabilities.standards.contains(&CppStandard::Cpp98));
         assert_eq!(fs::read_dir(&root)?.count(), 0);
         assert!(
             verify_compiler(

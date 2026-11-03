@@ -21,6 +21,7 @@ impl LanguageService {
         }
     }
     pub(super) fn close_document(&mut self, id: DocumentId, cx: &mut Context<Self>) {
+        self.clear_inlay_hints(id, cx);
         self.clear_diagnostics(id, cx);
         if let (Some(runtime), Some(document)) = (&self.runtime, self.documents.get(&id)) {
             document.buffer.update(cx, |buffer, cx| {
@@ -73,19 +74,20 @@ impl LanguageService {
             buffer.set_completion_triggers(server.server_id(), triggers, cx)
         });
         document.sent_version = document.version;
+        document.observed_snapshot = snapshot.clone();
         document.sent_snapshot = snapshot;
         Ok(())
     }
     pub(super) fn buffer_edited(&mut self, id: DocumentId, cx: &mut Context<Self>) {
+        self.clear_inlay_hints(id, cx);
         self.clear_diagnostics(id, cx);
+        if let Err(error) = self.observe_buffer_edits(id, cx) {
+            self.fail(format!("同步代码版本失败：{error:#}"), cx);
+            return;
+        }
         let Some(document) = self.documents.get_mut(&id) else {
             return;
         };
-        let Some(version) = document.version.checked_add(1) else {
-            self.fail("语言服务文档版本已耗尽，请重启语言服务".into(), cx);
-            return;
-        };
-        document.version = version;
         document.pending_change = Some(cx.spawn(async move |this, cx| {
             cx.background_executor().timer(CHANGE_DEBOUNCE).await;
             let _ = this.update(cx, |this, cx| {
@@ -94,7 +96,20 @@ impl LanguageService {
                 }
             });
         }));
+        self.refresh_inlay_hints(id, cx);
         cx.notify();
+    }
+    pub(super) fn observe_buffer_edits(&mut self, id: DocumentId, cx: &App) -> Result<()> {
+        let document = self.documents.get_mut(&id).context("语言服务文档已关闭")?;
+        let snapshot = document.buffer.read(cx).text_snapshot();
+        if snapshot.version() != document.observed_snapshot.version() {
+            document.version = document
+                .version
+                .checked_add(1)
+                .context("语言服务文档版本已耗尽，请重启软件")?;
+            document.observed_snapshot = snapshot;
+        }
+        Ok(())
     }
     pub(super) fn flush_change(&mut self, id: DocumentId, cx: &mut Context<Self>) -> Result<()> {
         let Some(runtime) = &self.runtime else {

@@ -214,8 +214,11 @@ fn transport_fixture(
                 version: 0,
                 sent_version: 0,
                 sent_snapshot: buffer.read(cx).text_snapshot(),
+                observed_snapshot: buffer.read(cx).text_snapshot(),
                 _edits: edits,
                 pending_change: None,
+                completion_error: None,
+                hints: Default::default(),
             },
         );
         service.runtime = Some(Runtime {
@@ -225,6 +228,102 @@ fn transport_fixture(
         service.phase = Phase::Ready;
     });
     (service, buffer, id, uri, fake)
+}
+
+#[gpui::test]
+fn inlay_hints_are_display_only_filtered_and_cancelled_after_edits(cx: &mut gpui::TestAppContext) {
+    cx.update(|cx| {
+        let store = settings::SettingsStore::test(cx);
+        cx.set_global(store);
+        assets::Assets.load_test_fonts(cx);
+        theme::init(theme::LoadThemes::JustBase, cx);
+        editor::init(cx);
+    });
+    let text = "/*🙂*/ auto answer = combine(4);";
+    let (service, buffer, id, uri, fake) = transport_fixture(cx, text);
+    let (editor, cx) = cx
+        .add_window_view(|window, cx| editor::Editor::for_buffer(buffer.clone(), None, window, cx));
+    service.update(cx, |service, cx| {
+        service.hint_settings.enabled = true;
+        service.documents.get_mut(&id).unwrap().hints.editor = Some(editor.downgrade());
+        service
+            .runtime
+            .as_ref()
+            .unwrap()
+            .server
+            .update_capabilities(|caps| {
+                caps.inlay_hint_provider = Some(lsp::OneOf::Left(true));
+            });
+        service.refresh_all_inlay_hints(cx);
+    });
+    let hints: Vec<lsp::InlayHint> = serde_json::from_value(serde_json::json!([
+        {"position":{"line":0,"character":18},"label":": int","kind":1},
+        {"position":{"line":0,"character":29},"label":[{"value":"count:","command":{"title":"ignored","command":"never.execute"}}],"kind":2,"paddingRight":true},
+        {"position":{"line":0,"character":3},"label":"invalid UTF-16","kind":2},
+        {"position":{"line":0,"character":29},"label":"invalid\nmultiline","kind":2}
+    ])).unwrap();
+    let expected_uri = uri.clone();
+    fake.set_request_handler::<lsp::request::InlayHintRequest, _, _>(move |params, _| {
+        assert_eq!(params.text_document.uri, expected_uri);
+        assert_eq!(params.range.end, lsp::Position::new(0, 32));
+        let hints = hints.clone();
+        async move { Ok(Some(hints)) }
+    });
+    cx.run_until_parked();
+    cx.executor().advance_clock(Duration::from_millis(250));
+    cx.run_until_parked();
+    let visible = |cx: &mut gpui::VisualTestContext| {
+        cx.update(|window, cx| {
+            editor.update(cx, |editor, cx| {
+                editor.snapshot(window, cx).display_snapshot.text()
+            })
+        })
+    };
+    let rendered = visible(cx);
+    assert!(rendered.contains(": int"), "{rendered}");
+    assert!(rendered.contains("count: "), "{rendered}");
+    assert!(!rendered.contains("invalid"), "{rendered}");
+    assert_eq!(
+        buffer.read_with(cx, |buffer, _| buffer.text()),
+        text,
+        "hints must not enter the source"
+    );
+
+    service.update(cx, |service, cx| {
+        service.hint_settings.types = false;
+        service.refresh_all_inlay_hints(cx);
+    });
+    cx.run_until_parked();
+    cx.executor().advance_clock(Duration::from_millis(250));
+    cx.run_until_parked();
+    assert!(!visible(cx).contains(": int"));
+    assert!(visible(cx).contains("count: "));
+
+    let (release, wait) = futures::channel::oneshot::channel();
+    let mut wait = Some(wait);
+    fake.set_request_handler::<lsp::request::InlayHintRequest, _, _>(move |_, _| {
+        let wait = wait.take().unwrap();
+        async move {
+            wait.await?;
+            Ok(Some(serde_json::from_value(serde_json::json!([{"position":{"line":0,"character":29},"label":"stale:","kind":2}]))?))
+        }
+    });
+    service.update(cx, |service, cx| service.refresh_all_inlay_hints(cx));
+    cx.run_until_parked();
+    cx.executor().advance_clock(Duration::from_millis(250));
+    cx.run_until_parked();
+    buffer.update(cx, |buffer, cx| {
+        buffer.edit([(0..0, "// changed\n")], None, cx)
+    });
+    let _ = release.send(());
+    cx.run_until_parked();
+    assert!(!visible(cx).contains("stale:"));
+    service.update(cx, |service, cx| {
+        service.hint_settings.enabled = false;
+        service.refresh_all_inlay_hints(cx);
+    });
+    assert_eq!(visible(cx), buffer.read_with(cx, |buffer, _| buffer.text()));
+    service.update(cx, |service, cx| service.shutdown(cx));
 }
 
 #[gpui::test]
@@ -309,6 +408,105 @@ async fn signature_provider_uses_utf16_current_parameter_and_discards_late_repli
     assert!(
         late.await.is_none(),
         "old content must not reopen a parameter popover"
+    );
+    service.update(cx, |service, cx| service.shutdown(cx));
+}
+
+#[gpui::test]
+fn typing_triggers_semantic_completion_and_a_failed_query_does_not_stop_clangd(
+    cx: &mut gpui::TestAppContext,
+) {
+    cx.update(|cx| {
+        let store = settings::SettingsStore::test(cx);
+        cx.set_global(store);
+        assets::Assets.load_test_fonts(cx);
+        theme::init(theme::LoadThemes::JustBase, cx);
+        editor::init(cx);
+        crate::keymap::init(&crate::configuration::AppPreferences::default(), cx).unwrap();
+    });
+    let prefix = "int main() { ans";
+    let (service, buffer, id, uri, fake) = transport_fixture(cx, prefix);
+    let (editor, cx) = cx.add_window_view(|window, cx| {
+        let mut editor = editor::Editor::for_buffer(buffer.clone(), None, window, cx);
+        editor.set_completion_provider(Some(Rc::new(ClangdProvider {
+            service: service.downgrade(),
+            document_id: id,
+        })));
+        editor.set_show_completions_on_input(Some(true));
+        editor.change_selections(
+            editor::SelectionEffects::no_scroll().completions(false),
+            window,
+            cx,
+            |selections| {
+                let end = editor::MultiBufferOffset(prefix.len());
+                selections.select_ranges([end..end]);
+            },
+        );
+        editor
+    });
+    cx.update(|window, cx| {
+        use gpui::Focusable;
+        editor.focus_handle(cx).focus(window, cx);
+    });
+    let calls = Arc::new(AtomicUsize::new(0));
+    let received = calls.clone();
+    fake.set_request_handler::<lsp::request::Completion, _, _>(move |params, _| {
+        assert_eq!(params.text_document_position.text_document.uri, uri);
+        let call = received.fetch_add(1, Ordering::Relaxed);
+        async move {
+            if call == 0 {
+                anyhow::bail!("transient completion error fixture");
+            }
+            Ok(Some(lsp::CompletionResponse::Array(vec![
+                lsp::CompletionItem {
+                    label: "answer(int limit)".into(),
+                    filter_text: Some("answer".into()),
+                    insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+                    text_edit: Some(lsp::CompletionTextEdit::Edit(lsp::TextEdit {
+                        range: lsp::Range::new(
+                            lsp::Position::new(0, 13),
+                            params.text_document_position.position,
+                        ),
+                        new_text: "answer(${1:limit})$0".into(),
+                    })),
+                    ..Default::default()
+                },
+            ])))
+        }
+    });
+    cx.simulate_keystrokes("w");
+    cx.run_until_parked();
+    assert_eq!(
+        calls.load(Ordering::Relaxed),
+        1,
+        "typing must request completion without a completion shortcut"
+    );
+    service.read_with(cx, |service, _| {
+        assert!(matches!(service.phase, Phase::Ready));
+        assert!(service.documents[&id].completion_error.is_some());
+    });
+    cx.simulate_keystrokes("e");
+    cx.run_until_parked();
+    assert_eq!(calls.load(Ordering::Relaxed), 2);
+    cx.simulate_keystrokes("tab");
+    cx.run_until_parked();
+    assert_eq!(
+        buffer.read_with(cx, |buffer, _| buffer.text()),
+        "int main() { answer(limit)"
+    );
+    service.read_with(cx, |service, _| {
+        assert!(service.documents[&id].completion_error.is_none())
+    });
+
+    editor.update(cx, |editor, _| {
+        editor.set_show_completions_on_input(Some(false))
+    });
+    cx.simulate_keystrokes("z");
+    cx.run_until_parked();
+    assert_eq!(
+        calls.load(Ordering::Relaxed),
+        2,
+        "automatic completion must respect the software preference"
     );
     service.update(cx, |service, cx| service.shutdown(cx));
 }

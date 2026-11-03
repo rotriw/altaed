@@ -20,7 +20,7 @@ pub(crate) struct Palette {
 }
 pub(crate) fn palette(cx: &App) -> Palette {
     let c = cx.theme().colors();
-    if cx.theme().appearance().is_light() {
+    if cx.theme().name.as_ref() == "默认浅色 (Light)" {
         Palette {
             paper: rgb(0xffffff).into(),
             success: rgb(0x247347).into(),
@@ -38,7 +38,7 @@ pub(crate) fn palette(cx: &App) -> Palette {
             paper: c.editor_background,
             success: cx.theme().status().success,
             subtle: c.surface_background,
-            readonly: c.panel_background,
+            readonly: c.editor_subheader_background,
             text: c.text,
             muted: c.text_muted,
             line: c.border,

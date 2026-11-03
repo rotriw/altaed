@@ -4,7 +4,7 @@
 
 软件设置是全局偏好；文档运行配置仍由每份代码独立保存。`config.json` 包含编辑器、工作台、默认工具链、C++ 语言服务、快捷键和插件全局选项。文档可独立覆盖编译器及编译参数；测试和 checker 配置仍归文档。
 
-首次启动在应用数据目录创建 `config.json`，并显示固定 700×400、不可调整大小的三页欢迎引导：欢迎、C++ 环境、快捷键。C++ 环境可以跳过，完成后才进入 IDE；未完成时下次启动继续显示。环境检测实际编译并执行 C++20 程序，通过时显示绿色状态标识。开发启动器默认目录是项目的 `.cache/ide-session/`；独立运行使用 `storage::data_directory()`，也可通过 `ALTAED_DATA_DIR` 明确指定。应用菜单提供“显示 config.json”和“重新载入 config.json”。
+首次启动在应用数据目录创建 `config.json`，并显示固定 700×400、不可调整大小的三页欢迎引导：欢迎、C++ 环境、快捷键。C++ 环境可以跳过，完成后才进入 IDE；未完成时下次启动继续显示。环境检测使用编译器默认模式实际编译并执行程序，显示版本，并提供检测通过的 C++ 标准选项；通过时显示绿色状态标识。开发启动器默认目录是项目的 `.cache/ide-session/`；独立运行使用 `storage::data_directory()`，也可通过 `ALTAED_DATA_DIR` 明确指定。应用菜单提供“显示 config.json”和“重新载入 config.json”。
 
 设置界面“应用”会保存并立即更新快捷键、所有代码视图和相应的工作台偏好。外部编辑配置后，通过菜单重新载入，无需关闭代码。格式、版本、命令名或快捷键无效时保留原文件；启动失败会显示可读错误，运行中载入失败会继续使用原有效配置。
 
@@ -14,12 +14,15 @@
 {
   "version": 1,
   "editor": {
+    "theme": "horizon-bright",
     "font_family": "Menlo",
     "font_size": 14.0,
     "line_numbers": true,
-    "soft_wrap": false
+    "soft_wrap": false,
+    "auto_completions": true,
+    "inlay_hints": { "enabled": false, "parameters": true, "types": true }
   },
-  "workbench": { "documents": false, "tests": true, "output": false, "reduce_motion": false },
+  "workbench": { "documents": false, "tests": true, "output": false, "reduce_motion": false, "compiling_color": null, "running_color": null },
   "toolchain": { "compiler_path": null, "setup_complete": true },
   "language_server": {
     "enabled": true,
@@ -29,10 +32,10 @@
     "request_timeout_ms": 5000
   },
   "keybindings": {
-    "run.compile": "cmd-shift-b",
+    "run.compile": "f9",
     "run.tests": "cmd-r",
-    "run.run": "f5",
-    "run.compile_and_run": "cmd-shift-r",
+    "run.run": "f10",
+    "run.compile_and_run": "f11",
     "edit.definition": "f12",
     "run.cancel": ""
   },
@@ -55,12 +58,13 @@
 | `configuration/preferences.rs` | 全局偏好数据模型、值校验与表单转换 |
 | `configuration/commands.rs` | 稳定命令身份、声明默认值与覆盖语义 |
 | `configuration/schema.rs` | 设置描述、选择项、条件显示和命名空间注册 |
+| `configuration/compiler.rs` | 软件默认值与文档共用的编译选项表单转换 |
 | `configuration/storage.rs` | 版本化 JSON、首次创建、旧版迁移、写入锁与变更检测 |
 | `keymap.rs` | GPUI 按键语法校验、冲突检查与完整映射替换 |
 | `atomic_file.rs` | 文档和配置共用的暂存、原子提交及失败清理 |
 | `app/configuration_commands.rs` | 重新载入和定位配置的界面命令 |
 | `app/startup.rs`、`app/welcome/` | 独立欢迎窗口、环境检测和首次配置 |
-| `toolchain.rs` | 编译器与可执行文件查找、真实 C++20 环境检测 |
+| `toolchain.rs` | 编译器与可执行文件查找、真实环境检测、版本与标准能力探测 |
 | `language_server/clangd_config.rs` | 每份文档的 clangd 编译命令 |
 | `editor_adapter/language_service/` | 协议进程、内容同步、补全、诊断和跳转 |
 | `app/language_intelligence.rs` | 文档／配置生命周期与跳转界面的协调 |
@@ -78,3 +82,14 @@
 软件设置中的“C++ 语言服务”控制开关、clangd 路径、启动参数和超时。修改后点击“应用”；外部编辑 JSON 后使用菜单重新载入。文档运行配置中的编译器、参数和工作目录也用于语言服务，保存该表单后生效。clangd 是外部程序，不随当前版本捆绑；缺失时仍可编辑和编译，状态栏显示原因，点击状态可重启。
 
 默认 F12 转到定义，按键仍可在快捷键表修改。补全使用 Zed Editor 的触发与选择行为。首轮不提供重命名、格式化、自动头文件插入或完整多文件工程索引；需要附加编辑或命令的补全项暂不展示，避免只执行部分改动。详细边界与验收见 [LSP 实现与测试](lsp.md)。
+
+输入时代码补全默认开启，可在“软件设置 → 编辑器”关闭自动弹出；手动补全快捷键仍可使用。“软件设置 → 行内提示”总开关默认关闭，开启后可分别控制 C++ 参数名与推导类型，应用后更新全部代码视图。提示只存在于 Editor 的显示层，复制、保存和编译使用的源码不包含它们。编译设置的默认值与文档覆盖规则见 [C++ 编译选项](cpp-toolchains.md)。
+
+## Dev-C++ 风格执行快捷键
+
+默认使用 F9 编译、F10 运行已有程序、F11 编译并运行。三项映射由 `settings/commands.json` 提供，欢迎页和软件设置继续允许单独修改；运行测试仍使用原来的快捷键。已有用户覆盖项不会因默认值改变而自动丢失。macOS 若将功能键用于系统控制，需同时按 Fn，或由用户自行调整系统功能键设置。
+
+## 主题与状态栏
+
+颜色主题为软件全局设置，使用稳定标识保存。状态栏编译／运行颜色为空时跟随主题，
+也可设置为 `#RRGGBB`。主题来源、变体与适配边界见 [颜色主题](themes.md)。

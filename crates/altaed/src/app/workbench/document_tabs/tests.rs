@@ -49,6 +49,7 @@ fn native_drag_moves_views_with_documents_preserves_identity_and_restores_order(
         document.metadata.tests.push(crate::document::TestCase {
             input: name.into(),
             expected_output: None,
+            ..Default::default()
         });
         documents.push(document);
     }

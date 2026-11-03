@@ -12,7 +12,6 @@ pub struct Layout {
     pub width: f32,
     pub height: f32,
     pub sidebar: f32,
-    pub header: f32,
     pub footer: f32,
     pub content_padding: f32,
     pub section_header: f32,
@@ -38,6 +37,7 @@ pub enum Kind {
     Decimal,
     Choice,
     Toggle,
+    Color,
 }
 #[derive(Clone, Deserialize)]
 pub struct Choice {
@@ -49,6 +49,13 @@ pub struct Condition {
     pub id: String,
     pub value: String,
 }
+#[derive(Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ChoicePresentation {
+    #[default]
+    Buttons,
+    Dropdown,
+}
 #[derive(Clone, Deserialize)]
 pub struct Setting {
     pub id: String,
@@ -56,6 +63,8 @@ pub struct Setting {
     pub label: String,
     pub description: String,
     pub kind: Kind,
+    #[serde(default)]
+    pub presentation: ChoicePresentation,
     #[serde(rename = "default")]
     pub default_value: serde_json::Value,
     #[serde(default)]
@@ -101,12 +110,23 @@ impl Setting {
             )
         };
         match self.kind {
+            Kind::Color => {
+                if !value.trim().is_empty() {
+                    super::RgbColor::parse(value)?;
+                }
+            }
             Kind::Integer => {
                 let number = value
                     .trim()
                     .parse::<u64>()
                     .map_err(|_| anyhow::anyhow!(invalid()))?;
                 ensure!(number as f64 >= self.min.unwrap_or(0.), "{}", invalid());
+                ensure!(
+                    self.max.is_none_or(|max| number as f64 <= max),
+                    "{}不能大于 {}",
+                    self.label,
+                    self.max.unwrap_or_default()
+                );
             }
             Kind::Decimal => {
                 let number = value
@@ -194,12 +214,39 @@ impl Registry {
                 required: false,
                 options: Vec::new(),
                 visible_when: None,
+                presentation: ChoicePresentation::Buttons,
             });
         }
         Ok(registry)
     }
     fn from_json(json: &str) -> Result<Self> {
-        let builtins: Builtins = serde_json::from_str(json)?;
+        let mut builtins: Builtins = serde_json::from_str(json)?;
+        for setting in &mut builtins.contribution.settings {
+            if matches!(
+                setting.id.as_str(),
+                "core.toolchain.optimization" | "core.compiler.optimization"
+            ) {
+                setting.options = crate::toolchain::Optimization::ALL
+                    .into_iter()
+                    .map(|optimization| Choice {
+                        value: optimization.value().into(),
+                        label: optimization.argument().unwrap_or("沿用附加参数").into(),
+                    })
+                    .collect();
+            }
+            if matches!(
+                setting.id.as_str(),
+                "core.toolchain.cpp_standard" | "core.compiler.standard"
+            ) {
+                setting.options = crate::toolchain::CppStandard::ALL
+                    .into_iter()
+                    .map(|standard| Choice {
+                        value: standard.value().into(),
+                        label: standard.label().into(),
+                    })
+                    .collect();
+            }
+        }
         let mut registry = Self {
             layout: builtins.layout,
             categories: Vec::new(),
@@ -258,7 +305,14 @@ impl Registry {
                 "设置引用了无效分类：{}",
                 setting.id
             );
-            setting.validate(&setting.default_text())?;
+            // Conditional paths/secrets have no useful default until enabled.
+            // Once visible they undergo the same required-field validation.
+            if !(setting.visible_when.is_some()
+                && setting.required
+                && setting.default_text().trim().is_empty())
+            {
+                setting.validate(&setting.default_text())?;
+            }
             if setting.kind == Kind::Choice {
                 let choices: BTreeSet<_> =
                     setting.options.iter().map(|choice| &choice.value).collect();
@@ -306,6 +360,10 @@ impl Registry {
             .collect();
         let core = [
             (
+                "core.compiler.standard",
+                settings.cpp_standard.value().into(),
+            ),
+            (
                 "core.compiler.path",
                 settings
                     .compiler_path
@@ -338,19 +396,36 @@ impl Registry {
                 settings.execution.output_limit_bytes.to_string(),
             ),
             (
+                "core.execution.test_data_limit",
+                settings.execution.test_data_limit_bytes.to_string(),
+            ),
+            (
                 "core.checker.mode",
-                match settings.execution.checker {
-                    Checker::Exact => "exact",
-                    Checker::Tokens => "tokens",
-                    Checker::Float { .. } => "float",
-                }
-                .into(),
+                settings.execution.checker.mode_id().into(),
             ),
         ];
         values.extend(core.into_iter().map(|(id, value)| (id.into(), value)));
+        values.extend(super::compiler::values(
+            "core.compiler",
+            &settings.compiler_options,
+        ));
         if let Checker::Float { absolute, relative } = settings.execution.checker {
             values.insert("core.checker.absolute".into(), absolute.to_string());
             values.insert("core.checker.relative".into(), relative.to_string());
+        }
+        if let Checker::Executable(checker) = &settings.execution.checker {
+            values.insert(
+                "core.checker.program".into(),
+                checker.program.display().to_string(),
+            );
+            values.insert(
+                "core.checker.timeout".into(),
+                checker.timeout_ms.to_string(),
+            );
+            values.insert(
+                "core.checker.arguments".into(),
+                checker.arguments.join("\n"),
+            );
         }
         for (id, value) in &settings.extensions {
             if self.settings.iter().any(|setting| &setting.id == id) {
@@ -385,6 +460,9 @@ impl Registry {
         ensure!(self.errors(values).is_empty(), "请修正标记的设置");
         let value = |id: &str| values.get(id).with_context(|| format!("缺少设置：{id}"));
         let mut settings = original.clone();
+        settings.cpp_standard =
+            crate::toolchain::CppStandard::parse(value("core.compiler.standard")?)?;
+        settings.compiler_options = super::compiler::apply("core.compiler", values)?;
         settings.compiler_path = (!value("core.compiler.path")?.trim().is_empty())
             .then(|| value("core.compiler.path").map(|path| path.trim().into()))
             .transpose()?;
@@ -402,14 +480,27 @@ impl Registry {
             value("core.execution.test_timeout")?.trim().parse()?;
         settings.execution.output_limit_bytes =
             value("core.execution.output_limit")?.trim().parse()?;
+        settings.execution.test_data_limit_bytes =
+            value("core.execution.test_data_limit")?.trim().parse()?;
         settings.execution.checker = match value("core.checker.mode")?.as_str() {
-            "exact" => Checker::Exact,
-            "tokens" => Checker::Tokens,
             "float" => Checker::Float {
                 absolute: value("core.checker.absolute")?.trim().parse()?,
                 relative: value("core.checker.relative")?.trim().parse()?,
             },
-            _ => anyhow::bail!("比较方式无效"),
+            "executable" => Checker::Executable(crate::checker::ExecutableChecker {
+                program: value("core.checker.program")?.trim().into(),
+                timeout_ms: value("core.checker.timeout")?.trim().parse()?,
+                arguments: value("core.checker.arguments")?
+                    .lines()
+                    .filter(|line| !line.is_empty())
+                    .map(str::to_owned)
+                    .collect(),
+            }),
+            id => Checker::builtins()
+                .into_iter()
+                .find(|(mode, _)| *mode == id)
+                .map(|(_, checker)| checker)
+                .context("比较方式无效")?,
         };
         self.apply_extensions(values, &mut settings.extensions)?;
         settings.execution.validate()?;
@@ -510,6 +601,29 @@ mod tests {
             registry.apply(&original, &values).is_ok(),
             "hidden float fields do not invalidate exact comparison"
         );
+        values.insert("core.checker.mode".into(), "executable".into());
+        assert!(
+            registry.apply(&original, &values).is_err(),
+            "an enabled native checker requires a path"
+        );
+        values.insert("core.checker.program".into(), "checker with spaces".into());
+        values.insert(
+            "core.checker.arguments".into(),
+            "one argument\n--verbose".into(),
+        );
+        let next = registry.apply(&original, &values)?;
+        assert!(
+            matches!(&next.execution.checker, Checker::Executable(checker) if checker.arguments == ["one argument", "--verbose"])
+        );
+        let restored = registry.values(&next);
+        for id in [
+            "core.checker.mode",
+            "core.checker.program",
+            "core.checker.arguments",
+            "core.checker.timeout",
+        ] {
+            assert_eq!(restored[id], values[id], "checker field round-trips: {id}");
+        }
         Ok(())
     }
 }

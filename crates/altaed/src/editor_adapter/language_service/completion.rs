@@ -70,10 +70,22 @@ impl CompletionProvider for ClangdProvider {
                 let response = match response {
                     Ok(response) => response,
                     Err(error) => {
-                        service.fail(format!("补全请求失败：{error:#}"), cx);
+                        // A single failed/cancelled completion must not tear
+                        // down diagnostics, signature help or the next query.
+                        if let Some(document) = service.documents.get_mut(&id) {
+                            document.completion_error = Some(format!(
+                                "补全请求失败：{error:#}；继续输入可重试，也可重启语言服务。"
+                            ));
+                        }
+                        cx.notify();
                         return Err(error);
                     }
                 };
+                if let Some(document) = service.documents.get_mut(&id)
+                    && document.completion_error.take().is_some()
+                {
+                    cx.notify();
+                }
                 let Some(response) = response else {
                     return Ok(Vec::new());
                 };

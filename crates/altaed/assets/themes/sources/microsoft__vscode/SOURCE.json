@@ -1,0 +1,24 @@
+{
+  "repository": "https://github.com/microsoft/vscode",
+  "revision": "77cb034f1124646ac77dec7889b10fca95c50446",
+  "files": [
+    "LICENSE.txt",
+    "extensions/theme-defaults/themes/dark_plus.json",
+    "extensions/theme-defaults/themes/dark_vs.json",
+    "extensions/theme-defaults/themes/light_plus.json",
+    "extensions/theme-defaults/themes/light_vs.json",
+    "extensions/theme-monokai/themes/monokai-color-theme.json",
+    "extensions/theme-solarized-dark/themes/solarized-dark-color-theme.json",
+    "extensions/theme-solarized-light/themes/solarized-light-color-theme.json"
+  ],
+  "sha256": {
+    "LICENSE.txt": "9480271317925265e806a9a196aaa33410a962fa9d4d1e248a4a5187bc8c9df9",
+    "dark_plus.json": "409f33088a5cfd6589384900ef80627787c568d367c25b12f31bc7940936e573",
+    "dark_vs.json": "9fc2c16761400632eac6166ff7bb0435c5190a94bffa51ec1ef19b2ce78576b2",
+    "light_plus.json": "26fbb053bec8ce2b65706d5fcb993da8c19174cfdbf35a49b465236b5ed26203",
+    "light_vs.json": "ce562a2ebec8c9a91021afb9ba7c9e8bcf4176df634fec8b77c748b42e3ce748",
+    "monokai-color-theme.json": "5681bcdc2e8f2994a41233bfdd1b02c2cfd90da5c6a4f5ebd4c8f42ef90d1b5f",
+    "solarized-dark-color-theme.json": "920e68b8a62e3e6581cee8d7900af1772865e5fe2b9efe5904baa4a8a89bc445",
+    "solarized-light-color-theme.json": "7c10e85f312c79dfccfa97fe97bb74c3d716a35f55e9701b30bc57e725ce1b44"
+  }
+}

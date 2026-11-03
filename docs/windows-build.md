@@ -21,7 +21,7 @@
 - 编译结果运行时只给子进程增加所选编译器的 bin 目录，便于查找 MinGW 运行时 DLL，不修改应用或系统的全局 PATH。
 - 新终端适配使用独立 PowerShell console、工作目录和每次启动的独立脚本记录；用 UTF-16LE EncodedCommand 传递命令。路径用 PowerShell 字面量转义，保留中文、空格和单引号，不修改执行策略。
 - 编译和测试子进程单独使用 CREATE_NO_WINDOW，避免每个用例弹出控制台；交互运行使用另一适配器明确创建新终端。
-- Windows release 入口使用 GUI subsystem。未验证 release 是否还依赖外部 DLL。
+- Windows 主应用在 debug/release 均使用 GUI subsystem，避免双击启动时附带控制台；测试 harness 保持正常控制台输出。编译/测试仍使用 CREATE_NO_WINDOW，clangd 的固定基线启动器也使用此标志；用户主动交互运行仍创建独立终端。此次修正在本地完成，Windows 上的实际窗口表现待发布前验收；未验证 release 是否还依赖外部 DLL。
 - 资源栏尺寸从编辑区预算中扣除，Windows 与 macOS 共用窗口布局逻辑。
 
 ## 构建机与运行命令
@@ -62,3 +62,17 @@ cargo +1.93 clippy -p altaed-core --locked --target x86_64-pc-windows-msvc --no-
 7. Windows 的 GPUI `set_menus` 仅保存菜单定义，不能把 macOS 菜单栏截图视为 Windows 菜单。需要补齐 Windows 应用菜单入口，并复用现有命令和快捷键配置；资源栏已有新建、打开和软件设置入口。
 
 实现参考：固定基线 `crates/gpui_windows`、`docs/src/development/windows.md`、`.cargo/config.toml`；PowerShell 参数行为参考 [Microsoft 官方说明](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_powershell_exe?view=powershell-5.1)。
+
+## 窗口外框适配（2026-11-03）
+
+主窗口与软件／文档设置窗口共用 `app/window_chrome.rs`：macOS 使用原生
+traffic lights（9px 偏移），Windows 使用右侧 caption 控件和 GPUI 的
+Min / Max / Close / Drag 命中区域，保留操作系统的最大化与 Snap 处理。
+Windows 标题栏32逻辑像素，使用系统 Segoe MDL2 Assets 图标，关闭按钮
+使用系统惯例的红色悬停。macOS 高度沿用固定 Zed UI 的平台计算。
+
+尺寸由 GPUI 按 DPI 缩放，窗体拖动不进入文档或表单状态。设置页不再重复
+绘制大页头；快捷设置入口与文档编辑状态独立。Windows 默认代码字体沿用
+平台适配器的 Consolas。网页可通过 `platform=windows` 检查控件方向与布局，
+它是视觉原型，不能替代 Windows 窗口操作和高 DPI 的实机验证。本轮仅做
+本地 macOS 构建和行为回归；按用户约束，不自动触发 Windows CI／发布构建。

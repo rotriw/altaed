@@ -4,7 +4,6 @@
     "width": 960,
     "height": 700,
     "sidebar": 192,
-    "header": 56,
     "footer": 52,
     "content_padding": 32,
     "section_header": 36,
@@ -40,12 +39,62 @@
       "placeholder": "自动查找"
     },
     {
+      "id": "core.compiler.standard",
+      "category": "core.compiler",
+      "label": "C++ 标准",
+      "description": "选择标准会覆盖参数中的 -std；默认保留手写参数，未指定时由编译器决定。",
+      "kind": "choice",
+      "default": "default",
+      "options": []
+    },
+    {
+      "id": "core.compiler.optimization",
+      "category": "core.compiler",
+      "label": "优化级别",
+      "description": "选择后覆盖附加参数中的 -O 选项；沿用时保留原有参数。",
+      "kind": "choice",
+      "default": "inherit",
+      "options": []
+    },
+    {
+      "id": "core.compiler.warnings",
+      "category": "core.compiler",
+      "label": "常用警告",
+      "description": "加入 -Wall 和 -Wextra，帮助发现可疑代码。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
+      "id": "core.compiler.debug_info",
+      "category": "core.compiler",
+      "label": "调试信息",
+      "description": "加入 -g，保留调试器和错误报告所需的符号。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
+      "id": "core.compiler.address_sanitizer",
+      "category": "core.compiler",
+      "label": "内存错误检查",
+      "description": "加入 AddressSanitizer，检测越界和释放后使用；需要编译器及运行库支持。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
+      "id": "core.compiler.undefined_sanitizer",
+      "category": "core.compiler",
+      "label": "未定义行为检查",
+      "description": "加入 UndefinedBehaviorSanitizer，检测有符号溢出等问题；需要工具链支持。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
       "id": "core.compiler.arguments",
       "category": "core.compiler",
-      "label": "编译参数",
-      "description": "每行一个参数，无需添加 shell 引号。",
+      "label": "附加编译参数",
+      "description": "每行一个参数，无需 shell 引号。启用的上方选项会在这些参数基础上生效。",
       "kind": "multiline",
-      "default": "-std=c++20\n-O2",
+      "default": "-O2",
       "placeholder": "每行一个参数"
     },
     {
@@ -91,24 +140,63 @@
       "control_width": 160
     },
     {
+      "id": "core.execution.test_data_limit",
+      "category": "core.execution",
+      "label": "测试数据总上限",
+      "description": "一次测试读取的输入与预期输出总大小，包含绑定文件。避免大数据占用过多内存。",
+      "kind": "integer",
+      "unit": "字节",
+      "min": 1,
+      "default": "67108864",
+      "control_width": 180
+    },
+    {
       "id": "core.checker.mode",
       "category": "core.checker",
       "label": "比较方式",
-      "description": "只影响启用“比较预期输出”的测试用例。",
+      "description": "预期输出有内容时自动比较；留空仅观察输出。",
       "kind": "choice",
-      "default": "tokens",
+      "default": "trimmed",
       "options": [
         {
+          "value": "trimmed",
+          "label": "忽略行末空格和文末换行"
+        },
+        {
           "value": "exact",
-          "label": "严格文本"
+          "label": "严格一致"
+        },
+        {
+          "value": "ncmp",
+          "label": "ncmp · 匹配 64 位整数"
+        },
+        {
+          "value": "rcmp4",
+          "label": "rcmp4 · 匹配浮点数，最大误差 1e-4"
+        },
+        {
+          "value": "rcmp6",
+          "label": "rcmp6 · 匹配浮点数，最大误差 1e-6"
+        },
+        {
+          "value": "rcmp9",
+          "label": "rcmp9 · 匹配浮点数，最大误差 1e-9"
         },
         {
           "value": "tokens",
-          "label": "忽略空白"
+          "label": "wcmp · 匹配字符串"
+        },
+        {
+          "value": "nyesno",
+          "label": "nyesno · 匹配 YES 和 NO，大小写不敏感"
         },
         {
           "value": "float",
-          "label": "浮点数"
+          "label": "自定义浮点容差"
+        },
+        {
+          "value": "executable",
+          "label": "外部比较器"
         }
       ]
     },
@@ -139,6 +227,48 @@
         "value": "float"
       },
       "control_width": 160
+    },
+    {
+      "id": "core.checker.program",
+      "category": "core.checker",
+      "label": "比较器文件",
+      "description": "现成的原生可执行文件，按 testlib 顺序接收输入、实际输出、预期输出三个文件路径。也可从测试栏导入。",
+      "kind": "text",
+      "default": "",
+      "required": true,
+      "visible_when": {
+        "id": "core.checker.mode",
+        "value": "executable"
+      },
+      "control_width": 360
+    },
+    {
+      "id": "core.checker.timeout",
+      "category": "core.checker",
+      "label": "比较器超时",
+      "description": "每个用例独立计时，超时报告为比较器错误。",
+      "kind": "integer",
+      "default": "2000",
+      "min": 1,
+      "unit": "ms",
+      "visible_when": {
+        "id": "core.checker.mode",
+        "value": "executable"
+      },
+      "control_width": 160
+    },
+    {
+      "id": "core.checker.arguments",
+      "category": "core.checker",
+      "label": "附加参数",
+      "description": "每行一个参数，追加在三个文件路径之后；不经过 shell 解析。",
+      "kind": "multiline",
+      "default": "",
+      "visible_when": {
+        "id": "core.checker.mode",
+        "value": "executable"
+      },
+      "control_width": 360
     }
   ]
 }

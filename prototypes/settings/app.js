@@ -10,6 +10,8 @@ const schema = await fetch(documentSettings ? 'document-schema.json' : 'schema.j
   if (!response.ok) throw new Error('无法载入设置描述');
   return response.json();
 });
+const themeCatalog = documentSettings ? null : await fetch('test-panel/themes.json').then(response=>response.json());
+const themePreview = documentSettings ? null : await fetch('test-panel/preview.json').then(response=>response.json());
 let commandDefinitions=[];
 if(!documentSettings){
   commandDefinitions=await fetch('commands.json').then(response=>response.json());
@@ -19,9 +21,11 @@ if(!documentSettings){
 for (const [key, value] of Object.entries(schema.layout)) document.documentElement.style.setProperty(`--${key}`, `${value}px`);
 if(new URLSearchParams(location.search).get('reference')==='narrow'){document.documentElement.style.setProperty('--width','390px');document.documentElement.style.setProperty('--height','760px');}
 const base = Object.fromEntries(schema.settings.map(setting => [setting.id, setting.default]));
+if(themeCatalog?.themes.some(theme=>theme.id===new URLSearchParams(location.search).get('theme')))base['core.editor.theme']=new URLSearchParams(location.search).get('theme');
+if(new URLSearchParams(location.search).get('platform')==='windows')base['core.editor.font_family']='Consolas';
 let saved = {...base};
 let draft = {...base};
-let category = schema.categories[0].id;
+let category = schema.categories.find(item=>item.id===new URLSearchParams(location.search).get('category'))?.id || schema.categories[0].id;
 let query = '';
 let errors = {};
 const example = {
@@ -42,7 +46,7 @@ function matching(setting) {
 }
 function fields() { return activeSchema().settings.filter(setting => visible(setting) && (query ? matching(setting) : setting.category === category)); }
 function validate(setting) {
-  const value = draft[setting.id];
+  const value = String(draft[setting.id] ?? '');
   if(setting.category==='core.keybindings'&&String(value).trim()){
     const modifiers=new Set(['cmd','ctrl','alt','shift','fn']);
     for(const chord of value.trim().split(/\s+/)){const parts=chord.split('-');const key=parts.pop();if(!key||parts.some(part=>!modifiers.has(part))||new Set(parts).size!==parts.length)return '快捷键格式无效，例如 cmd-shift-b；留空可停用。';}
@@ -69,6 +73,30 @@ function nav() {
     button.onclick=()=>{category=item.id;query='';$('#search').value='';render();}; navigation.append(button);
   }
 }
+function applyPageTheme(id) {
+  const theme=themeCatalog?.themes.find(theme=>theme.id===id);if(!theme)return;
+  for(const [name,key] of Object.entries({paper:'background',subtle:'surface.background',readonly:'editor.subheader.background',text:'text',muted:'text.muted',line:'border',accent:'text.accent',selection:'element.selected',error:'error'}))document.documentElement.style.setProperty('--'+name,theme.style[key]);
+  document.documentElement.style.colorScheme=theme.appearance;
+}
+function themeControl(setting) {
+  const selected=themeCatalog.themes.find(theme=>theme.id===draft[setting.id]);
+  const wrap=document.createElement('div');wrap.className='theme-control';
+  const trigger=document.createElement('button');trigger.type='button';trigger.className='theme-trigger';trigger.id=setting.id;
+  trigger.setAttribute('aria-label','颜色主题');trigger.setAttribute('aria-haspopup','listbox');trigger.setAttribute('aria-expanded','false');
+  const swatches=theme=>{const band=document.createElement('span');band.className='theme-swatches';band.setAttribute('aria-hidden','true');for(const token of ['keyword','function','string','number']){const ink=document.createElement('i');ink.style.background=theme.style.syntax[token].color;band.append(ink);}return band;};
+  const arrow=document.createElementNS('http://www.w3.org/2000/svg','svg');arrow.setAttribute('viewBox','0 0 24 24');arrow.innerHTML='<path d="m7 10 5 5 5-5"/>';
+  const label=document.createElement('span');label.className='theme-name';label.textContent=selected.label;trigger.append(swatches(selected),label,arrow);
+  const menu=document.createElement('div');menu.className='theme-menu';menu.setAttribute('role','listbox');menu.setAttribute('aria-label','选择颜色主题');menu.hidden=true;
+  for(const theme of themeCatalog.themes){const option=document.createElement('button');option.type='button';option.setAttribute('role','option');option.setAttribute('aria-selected',String(theme.id===selected.id));option.append(swatches(theme),document.createTextNode(theme.label));if(theme.id===selected.id){const check=document.createElementNS('http://www.w3.org/2000/svg','svg');check.setAttribute('viewBox','0 0 24 24');check.innerHTML='<path d="m5 12 4 4L19 6"/>';option.append(check);}option.onclick=()=>{draft[setting.id]=theme.id;render();document.querySelector('main').scrollTop=scrollBefore;document.getElementById(setting.id).focus({preventScroll:true});};menu.append(option);}
+  let scrollBefore=0;
+  const close=()=>{menu.hidden=true;trigger.setAttribute('aria-expanded','false');};
+  trigger.onclick=()=>{scrollBefore=document.querySelector('main').scrollTop;menu.hidden=!menu.hidden;trigger.setAttribute('aria-expanded',String(!menu.hidden));if(!menu.hidden)menu.querySelector('[aria-selected=true]').focus();};
+  wrap.onkeydown=event=>{const options=[...menu.querySelectorAll('button')];if(event.key==='Escape'){close();trigger.focus();event.stopPropagation();}else if(!menu.hidden&&['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();let index=options.indexOf(document.activeElement);index=event.key==='Home'?0:event.key==='End'?options.length-1:(index+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;options[index].focus();}};
+  wrap.addEventListener('focusout',event=>{if(!wrap.contains(event.relatedTarget))close();});
+  wrap.append(trigger,menu);
+  const preview=document.createElement('div');preview.className='theme-code';preview.setAttribute('aria-label','C++ 配色预览');preview.style.background=selected.style['editor.background'];preview.style.color=selected.style['editor.foreground'];preview.style.borderColor=selected.style.border;
+  themePreview.forEach((fragments,index)=>{const line=document.createElement('div');const number=document.createElement('span');number.className='preview-line';number.textContent=index+1;number.style.color=selected.style['text.muted'];line.append(number);fragments.forEach(fragment=>{const span=document.createElement('span');span.textContent=fragment.text;const style=selected.style.syntax[fragment.capture];if(style){span.style.color=style.color;span.style.fontStyle=style.font_style||'normal';span.style.fontWeight=style.font_weight||400;}line.append(span);});preview.append(line);});wrap.append(preview);return wrap;
+}
 function render() {
   nav();
   const selected=activeSchema().categories.find(item=>item.id===category) || schema.categories[0];
@@ -87,7 +115,9 @@ function render() {
     const labelRow=document.createElement('div');labelRow.className='setting-label';
     const label=document.createElement('label');label.className='title';label.htmlFor=setting.id;label.textContent=setting.label;labelRow.append(label);
     if (setting.unit){const unit=document.createElement('span');unit.className='unit';unit.textContent=setting.unit;labelRow.append(unit);}row.append(labelRow);
-    if(setting.kind==='choice'){
+    if(setting.id==='core.editor.theme'){
+      row.append(themeControl(setting));
+    }else if(setting.kind==='choice'){
       const choices=document.createElement('div');choices.className='choices';choices.id=setting.id;choices.setAttribute('role','radiogroup');choices.setAttribute('aria-label',setting.label);
       setting.options.forEach(option=>{const button=document.createElement('button');button.type='button';button.textContent=option.label;button.setAttribute('role','radio');button.setAttribute('aria-checked',String(draft[setting.id]===option.value));button.onclick=()=>{draft[setting.id]=option.value;render();$('#'+CSS.escape(setting.id)).querySelector('[aria-checked=true]').focus();};choices.append(button);});row.append(choices);
     }else if(setting.kind==='toggle'){
@@ -125,11 +155,17 @@ $('#cancel').onclick=()=>{draft={...saved};errors={};render();updateStatus('已�
 $('#apply').onclick=()=>{
   errors={};for(const setting of activeSchema().settings.filter(visible)){const error=validate(setting);if(error)errors[setting.id]=error;}
   if(Object.keys(errors).length){const first=activeSchema().settings.find(setting=>errors[setting.id]);category=first.category;query='';$('#search').value='';render();document.getElementById(first.id).focus();updateStatus('请修正标记的设置');return;}
-  saved={...draft};updateStatus(documentSettings?'已应用到当前文档':'软件设置已应用');
+  saved={...draft};applyPageTheme(saved['core.editor.theme']);updateStatus(documentSettings?'已应用到当前文档':'软件设置已应用');
 };
 $('#extension-preview').onchange=()=>{
   for(const setting of example.settings)if(!(setting.id in draft)){draft[setting.id]=setting.default;saved[setting.id]=setting.default;}
   if(!$('#extension-preview').checked && category.startsWith('plugin.'))category=schema.categories[0].id;render();
 };
 document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key==='f'){event.preventDefault();$('#search').focus();}if(event.key==='Escape'&&query){query='';$('#search').value='';render();}});
+applyPageTheme(saved['core.editor.theme']);
 render();
+
+const platformPreview=document.querySelector('#platform-preview');
+platformPreview.value=new URLSearchParams(location.search).get('platform')==='windows'?'windows':'macos';
+const updatePlatform=()=>document.documentElement.classList.toggle('is-windows',platformPreview.value==='windows');
+platformPreview.onchange=updatePlatform;updatePlatform();

@@ -3,6 +3,7 @@
 //! stores. One process serves privately identified code documents.
 mod completion;
 mod documents;
+mod hints;
 mod navigation;
 mod process;
 mod signature;
@@ -48,8 +49,11 @@ struct DocumentState {
     version: i32,
     sent_version: i32,
     sent_snapshot: TextBufferSnapshot,
+    observed_snapshot: TextBufferSnapshot,
     _edits: Subscription,
     pending_change: Option<Task<()>>,
+    completion_error: Option<String>,
+    hints: hints::DocumentHints,
 }
 struct Runtime {
     server: Arc<LanguageServer>,
@@ -66,6 +70,7 @@ pub(crate) enum Phase {
 pub(crate) struct LanguageService {
     root: PathBuf,
     settings: LanguageServerSettings,
+    hint_settings: crate::language_server::InlayHintSettings,
     drivers: BTreeSet<String>,
     documents: HashMap<DocumentId, DocumentState>,
     // Keep the last version across close/reopen so a delayed reply for the same
@@ -85,6 +90,7 @@ impl LanguageService {
         cx.new(|_| Self {
             root,
             settings: LanguageServerSettings::default(),
+            hint_settings: Default::default(),
             drivers: BTreeSet::new(),
             documents: HashMap::new(),
             closed_versions: HashMap::new(),
@@ -102,6 +108,22 @@ impl LanguageService {
         if let Some(error) = self.document_errors.get(&id) {
             return ("clangd 配置错误", Some(error));
         }
+        if matches!(self.phase, Phase::Ready)
+            && let Some(error) = self
+                .documents
+                .get(&id)
+                .and_then(|document| document.completion_error.as_deref())
+        {
+            return ("clangd · 补全请求失败", Some(error));
+        }
+        if matches!(self.phase, Phase::Ready)
+            && let Some(error) = self
+                .documents
+                .get(&id)
+                .and_then(|document| document.hints.error.as_deref())
+        {
+            return ("clangd · 行内提示不可用", Some(error));
+        }
         match &self.phase {
             Phase::Disabled => ("语言服务已关闭", None),
             Phase::Preparing => ("clangd 准备中…", None),
@@ -114,10 +136,17 @@ impl LanguageService {
         &mut self,
         bindings: Vec<Binding>,
         settings: LanguageServerSettings,
+        hint_settings: crate::language_server::InlayHintSettings,
         default_compiler: Option<PathBuf>,
         cx: &mut Context<Self>,
     ) {
         self.configuration_generation += 1;
+        if self.hint_settings != hint_settings {
+            self.hint_settings = hint_settings.clone();
+            for id in self.documents.keys().copied().collect::<Vec<_>>() {
+                self.clear_inlay_hints(id, cx);
+            }
+        }
         if !settings.enabled {
             self.preparing_task = None;
             self.preparing = false;
@@ -173,7 +202,7 @@ impl LanguageService {
                 match prepared {
                     Ok((root, plans)) => {
                         this.root = root;
-                        this.commit_bindings(plans, settings, cx);
+                        this.commit_bindings(plans, settings, hint_settings, cx);
                     }
                     Err(error) => this.fail(format!("{error:#}"), cx),
                 }
@@ -185,6 +214,7 @@ impl LanguageService {
         &mut self,
         prepared: Vec<(Binding, Result<DocumentPlan>)>,
         settings: LanguageServerSettings,
+        hint_settings: crate::language_server::InlayHintSettings,
         cx: &mut Context<Self>,
     ) {
         let changed = match self.reconcile_bindings(prepared, cx) {
@@ -204,6 +234,7 @@ impl LanguageService {
         let restart =
             self.settings != settings || self.drivers != drivers || self.runtime.is_none();
         self.settings = settings;
+        self.hint_settings = hint_settings;
         self.drivers = drivers;
         if !self.settings.enabled {
             self.stop(cx);
@@ -212,6 +243,8 @@ impl LanguageService {
             self.restart(cx);
         } else if let Err(error) = self.reconfigure_documents(changed, cx) {
             self.fail(format!("更新语言服务配置失败：{error:#}"), cx);
+        } else {
+            self.refresh_all_inlay_hints(cx);
         }
 
         cx.notify();
@@ -288,8 +321,11 @@ impl LanguageService {
                     version,
                     sent_version: -1,
                     sent_snapshot: binding.buffer.read(cx).text_snapshot(),
+                    observed_snapshot: binding.buffer.read(cx).text_snapshot(),
                     _edits: edits,
                     pending_change: None,
+                    completion_error: None,
+                    hints: Default::default(),
                 },
             );
             true
@@ -305,6 +341,17 @@ impl LanguageService {
         } else {
             false
         };
+        if self
+            .documents
+            .get(&id)
+            .and_then(|document| document.hints.editor.as_ref())
+            .is_none_or(|editor| editor.entity_id() != binding.editor.entity_id())
+        {
+            self.clear_inlay_hints(id, cx);
+            if let Some(document) = self.documents.get_mut(&id) {
+                document.hints.editor = Some(binding.editor.downgrade());
+            }
+        }
         let provider = Rc::new(ClangdProvider {
             service: cx.weak_entity(),
             document_id: id,

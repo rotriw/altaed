@@ -39,6 +39,7 @@ impl Startup {
         let preferences = self.preferences.clone();
         cx.open_window(
             WindowOptions {
+                titlebar: Some(super::window_chrome::options()),
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 window_min_size: Some(size(px(900.), px(500.))),
                 ..Default::default()
@@ -46,13 +47,14 @@ impl Startup {
             |window, cx| {
                 window.set_window_title("altaed");
                 window.on_window_should_close(cx, |_, cx| {
-                    cx.quit();
+                    super::request_quit(cx);
                     false
                 });
                 theme::setup_ui_font(window, cx);
                 cx.new(|cx| {
                     let mut ide = Ide::new(session, directory, language, window, cx);
                     ide.set_preferences(preferences, cx);
+                    ide.imports.active = true;
                     ide
                 })
             },

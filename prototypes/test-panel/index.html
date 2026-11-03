@@ -1,15 +1,62 @@
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>altaed · 测试区布局验证</title><link rel="stylesheet" href="style.css"><body>
-<div class="prototype"><span>布局原型 · 结果为演示，源码不执行</span><div><button id="stress">载入 500 例</button><span id="metrics"></span></div></div>
-<header class="window"><strong>altaed</strong><span>solution.cpp</span><nav>文件　编辑　运行　视图</nav></header>
-<div class="workspace"><main><div class="file-tab"><span>solution.cpp</span><div><button data-command="compile">编译</button><button data-command="tests">运行测试</button><button data-command="terminal">交互执行</button></div></div><pre aria-label="代码区示意">#include &lt;iostream&gt;
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>altaed · 测试区排版原型</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<svg class="symbols" aria-hidden="true"><defs>
+<symbol id="i-chevron" viewBox="0 0 16 16"><path d="m5 6 3 3 3-3"/></symbol>
+<symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+<symbol id="i-check" viewBox="0 0 16 16"><path d="m3 8 3 3 7-7"/></symbol>
+<symbol id="i-close" viewBox="0 0 16 16"><path d="m4 4 8 8m0-8-8 8"/></symbol>
+<symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 5V3h5l2 2h5v8H2Z"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 16 16"><path d="M2 4h4m3 0h5M2 8h7m3 0h2M2 12h2m3 0h7M6 2v4m3 0v4m-5 0v4"/></symbol>
+<symbol id="i-play" viewBox="0 0 16 16"><path d="m5 3 7 5-7 5Z"/></symbol>
+</defs></svg>
+<div class="prototype"><span>交互原型 · 数据与执行结果为演示</span><div><select id="platform-preview" aria-label="平台预览"><option value="macos">macOS</option><option value="windows">Windows</option></select><select id="color-theme" aria-label="颜色主题预览"></select><button id="preview-compile">预览编译</button><button id="preview-run">预览运行</button><button id="status-settings">底栏颜色</button><button id="stress">500 例</button><button id="empty">空状态</button><button id="reset">恢复样例</button><span id="metrics"></span></div></div>
+<header class="window"><div class="traffic-lights" role="img" aria-label="macOS 窗口控制，原型示意"><i></i><i></i><i></i></div><button id="title-open-file">打开文件…</button><input type="file" id="title-file" accept=".cpp,.cc,.cxx,.c,.h,.hpp,.txt" hidden><div class="window-drag"></div><div class="quick-settings"><button id="global-settings" aria-expanded="false" aria-controls="quick-settings-menu">设置<svg><use href="#i-chevron"/></svg></button><div id="quick-settings-menu" role="menu" hidden><a role="menuitem" href="settings/?category=core.editor">颜色主题</a><a role="menuitem" href="settings/?category=core.toolchain">编译环境</a><a role="menuitem" href="settings/?category=core.keybindings">快捷键</a><hr><a role="menuitem" href="settings/">全部设置…</a><hr><button role="menuitem" disabled>登录（尚未开放）</button></div></div><div class="windows-controls" role="img" aria-label="Windows 窗口控制，原型示意"><svg viewBox="0 0 24 24"><path d="M7 16h10"/></svg><svg viewBox="0 0 24 24"><path d="M7 7h10v10H7Z"/></svg><svg viewBox="0 0 24 24"><path d="m7 7 10 10m0-10L7 17"/></svg></div></header>
+<div class="workspace">
+<main>
+<div class="file-tabs" role="tablist" aria-label="代码文档"><button role="tab" id="tab-first" aria-selected="true" data-document="0">solution.cpp</button><button role="tab" id="tab-second" aria-selected="false" data-document="1">another.cpp</button></div>
+<div class="source" aria-label="代码区示意"><pre class="line-numbers" aria-hidden="true">1
+2
+3
+4
+5
+6
+7
+8</pre><pre><span data-token="preproc">#include</span> <span data-token="string">&lt;iostream&gt;</span>
 
-int main() {
-    long long value;
-    std::cin &gt;&gt; value;
-    std::cout &lt;&lt; value * 2 &lt;&lt; '\n';
-}</pre></main><div id="width-handle" class="handle vertical" role="separator" aria-label="测试区宽度" aria-orientation="vertical" tabindex="0"></div><aside>
-<section id="messages"><div class="heading"><strong>运行信息</strong><button id="clear">清空</button></div><pre id="log">尚未运行。编辑用例后可预览结果。</pre></section><div id="height-handle" class="handle horizontal" role="separator" aria-label="运行信息高度" aria-orientation="horizontal" tabindex="0"></div>
-<div class="test-heading"><strong>测试数据 <span id="count"></span></strong><button id="add">添加用例</button></div>
+<span data-token="keyword">int</span> <span data-token="function">main</span>() {
+    <span data-token="type">long long</span> <span data-token="variable">value</span>;
+    std::cin <span data-token="operator">&gt;&gt;</span> <span data-token="variable">value</span>;
+    std::cout <span data-token="operator">&lt;&lt;</span> <span data-token="variable">value</span> * <span data-token="number">2</span> <span data-token="operator">&lt;&lt;</span> <span data-token="string">'\n'</span>;
+}
+<span data-token="comment">// 当前文档的测试与比较方式独立保存。</span></pre></div>
+<div class="editor-actions"><span>行 1，列 1</span><div><button data-command="compile">编译 <kbd>F9</kbd></button><button data-command="run">运行 <kbd>F10</kbd></button><button data-command="tests">运行测试</button><button data-command="terminal">编译并运行 <kbd>F11</kbd></button></div></div>
+</main>
+<div id="width-handle" class="handle vertical" role="separator" aria-label="测试区宽度" aria-orientation="vertical" aria-valuemin="340" aria-valuemax="900" aria-valuenow="520" tabindex="0"></div>
+<aside aria-label="当前文档测试区">
+<section id="messages"><div class="heading"><strong>运行信息</strong><button id="clear">清空</button></div><pre id="log">编译完成 · 263 ms
+用例 1：Accepted · 12 ms
+用例 2：WrongAnswer · 12 ms</pre></section>
+<div id="height-handle" class="handle horizontal" role="separator" aria-label="运行信息高度" aria-orientation="horizontal" aria-valuemin="66" aria-valuemax="400" aria-valuenow="150" tabindex="0"></div>
+<div class="test-heading"><div><strong>测试数据</strong><span id="count"></span></div><button id="add"><svg><use href="#i-plus"/></svg>添加用例</button></div>
+<div class="checker-toolbar" role="group" aria-label="当前文档比较方式">
+<label for="checker">比较器</label><select id="checker" aria-label="比较器"><option value="trailing">忽略行末空格和文末换行</option><option value="exact">严格一致</option><option value="ncmp">ncmp · 匹配 64 位整数</option><option value="rcmp4">rcmp4 · 匹配浮点数，最大误差 1e-4</option><option value="rcmp6">rcmp6 · 匹配浮点数，最大误差 1e-6</option><option value="rcmp9">rcmp9 · 匹配浮点数，最大误差 1e-9</option><option value="tokens">wcmp · 匹配字符串</option><option value="nyesno">nyesno · 匹配 YES 和 NO，大小写不敏感</option><option value="float">自定义浮点容差</option></select>
+<button id="import-checker" title="导入现成可执行比较器"><svg><use href="#i-folder"/></svg><span>导入</span></button>
+<button id="checker-settings" class="icon-button" aria-label="比较器设置" aria-expanded="false" aria-controls="checker-options" title="比较器设置"><svg><use href="#i-sliders"/></svg></button>
+<input id="checker-file" type="file" hidden>
+</div>
+<section id="checker-options" hidden aria-label="比较器参数">
+<div id="text-options"><span>忽略每行末尾的空格和 Tab，保留行中空格与末尾换行。</span></div>
+<div id="float-options" hidden class="option-fields"><label>绝对误差<input id="absolute" type="number" value="0.000001" min="0" step="any"></label><label>相对误差<input id="relative" type="number" value="0.000001" min="0" step="any"></label></div>
+<div id="executable-options" hidden><div class="checker-path" id="checker-path"></div><div class="option-fields"><label>超时（ms）<input id="checker-timeout" type="number" value="2000" min="1"></label><label>附加参数（每行一个）<textarea id="checker-arguments" rows="2"></textarea></label></div></div>
+<p id="checker-error" role="alert" hidden></p>
+</section>
 <div id="cases" role="region" aria-label="测试用例列表"><div id="empty-tests" hidden><strong>还没有测试用例</strong><p>添加输入和预期输出，即可测试当前代码。</p><button id="add-first">添加第一个用例</button></div><div id="spacer"></div><div id="visible"></div></div>
-<footer><span>忽略空白</span><span>输入与预期输出可编辑 · 实际输出只读</span></footer></aside></div>
-<script src="app.js"></script></body></html>
+</aside>
+</div>
+<div class="status" id="statusbar"><div><button id="toggle-output">输出</button><span id="status" role="status" aria-live="polite">就绪</span></div><span id="document-scope">行 1，列 1</span></div>
+<div id="status-colors" popover><strong>状态栏颜色</strong><label>编译时底色<input id="compile-color" type="color" value="#e8f0fb"></label><label>运行时底色<input id="run-color" type="color" value="#e8f3ec"></label><span>全局设置 · 预览不保存到软件</span><button id="preview-idle">恢复常态</button></div>
+<dialog id="diff-dialog" aria-labelledby="diff-title"><header><strong id="diff-title">用例 2 · 输出差异</strong><button id="diff-close" aria-label="关闭差异"><svg><use href="#i-close"/></svg></button></header><div class="diff-columns"><section><h2>预期输出</h2><pre id="diff-expected"></pre></section><section><h2>实际输出</h2><pre id="diff-actual"></pre></section></div></dialog>
+<script src="app.js"></script>
+</body></html>

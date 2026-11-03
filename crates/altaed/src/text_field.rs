@@ -11,6 +11,14 @@ pub fn init(cx: &mut App) {
     crate::keymap::bind_test_defaults(cx).unwrap();
 }
 pub struct Changed;
+enum InputMode {
+    SingleLine,
+    Multiline {
+        minimum_lines: usize,
+        maximum_lines: usize,
+    },
+    Document,
+}
 pub struct TextField {
     input: Entity<Editor>,
     multiline: bool,
@@ -27,29 +35,59 @@ impl TextField {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        Self::create(text, true, read_only, window, cx)
+        Self::create(
+            text,
+            InputMode::Multiline {
+                minimum_lines: 3,
+                maximum_lines: 4,
+            },
+            read_only,
+            window,
+            cx,
+        )
+    }
+    pub fn compact_multiline(text: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self::create(
+            text,
+            InputMode::Multiline {
+                minimum_lines: 2,
+                maximum_lines: 2,
+            },
+            false,
+            window,
+            cx,
+        )
     }
     pub fn single_line(text: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        Self::create(text, false, false, window, cx)
+        Self::create(text, InputMode::SingleLine, false, window, cx)
+    }
+    pub fn document(text: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self::create(text, InputMode::Document, false, window, cx)
     }
     fn create(
         text: String,
-        multiline: bool,
+        mode: InputMode,
         read_only: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let multiline = !matches!(mode, InputMode::SingleLine);
         let input = cx.new(|cx| {
-            let mut input = if multiline {
-                Editor::auto_height(3, 4, window, cx)
-            } else {
-                Editor::single_line(window, cx)
+            let mut input = match mode {
+                InputMode::Multiline {
+                    minimum_lines,
+                    maximum_lines,
+                } => Editor::auto_height(minimum_lines, maximum_lines, window, cx),
+                InputMode::SingleLine => Editor::single_line(window, cx),
+                InputMode::Document => {
+                    let buffer = cx.new(|cx| language::Buffer::local(String::new(), cx));
+                    Editor::for_buffer(buffer, None, window, cx)
+                }
             };
             input.set_text_style_refinement(gpui::TextStyleRefinement {
                 font_family: Some(crate::platform::code_font().into()),
                 font_size: Some(gpui::px(12.).into()),
                 line_height: Some(gpui::px(20.).into()),
-                color: Some(crate::panel_style::palette(cx).text),
                 ..Default::default()
             });
             input.set_autoindent(false);
@@ -76,6 +114,11 @@ impl TextField {
     }
     pub fn text(&self, cx: &App) -> String {
         self.input.read(cx).text(cx)
+    }
+    /// A cheap edit marker for large plain-text dialogs. Reading the whole text
+    /// for a dirty asterisk on every frame would scale with file size.
+    pub fn revision(&self, cx: &App) -> usize {
+        self.input.read(cx).buffer().read(cx).read(cx).edit_count()
     }
     pub fn set_read_only(&mut self, read_only: bool, cx: &mut Context<Self>) {
         self.read_only = read_only;
@@ -138,6 +181,30 @@ impl Render for TextField {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[gpui::test]
+    fn plain_document_accepts_newlines_and_tracks_edits_without_reading_text(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(|cx| {
+            let store = settings::SettingsStore::test(cx);
+            cx.set_global(store);
+            assets::Assets.load_test_fonts(cx);
+            theme::init(theme::LoadThemes::JustBase, cx);
+            editor::init(cx);
+            init(cx);
+        });
+        let (field, cx) =
+            cx.add_window_view(|window, cx| TextField::document("plain text".into(), window, cx));
+        let original = field.read_with(cx, |field, cx| field.revision(cx));
+        cx.update(|window, cx| window.focus(&field.focus_handle(cx), cx));
+        cx.simulate_keystrokes("enter");
+        cx.run_until_parked();
+        field.read_with(cx, |field, cx| {
+            assert!(field.text(cx).contains('\n'));
+            assert!(field.revision(cx) > original);
+            assert_eq!(field.revision(cx), field.revision(cx));
+        });
+    }
     #[gpui::test]
     fn enter_in_multiline_inserts_a_newline(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {

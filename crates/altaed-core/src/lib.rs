@@ -5,9 +5,13 @@
 //! so a later edit cannot change an in-flight build or an existing terminal.
 pub mod atomic_file;
 pub mod checker;
+pub mod companion;
 pub mod document;
+pub mod output_diff;
 pub mod platform;
+pub mod problem;
 pub mod runner;
+pub mod sample_files;
 pub mod session;
 pub mod storage;
 pub mod toolchain;

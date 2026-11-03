@@ -1,0 +1,24 @@
+{
+  "repository": "https://github.com/jolaleye/horizon-theme-vscode",
+  "revision": "5ae91b6d49bf291e0a34c0a1cb277d9738aadd90",
+  "files": [
+    "package.json",
+    "LICENSE",
+    "themes/horizon.json",
+    "themes/horizon-italic.json",
+    "themes/horizon-bold.json",
+    "themes/horizon-bright.json",
+    "themes/horizon-bright-italic.json",
+    "themes/horizon-bright-bold.json"
+  ],
+  "sha256": {
+    "LICENSE": "97483fdadb8769f3e6f44a13a65e2538a7661950210558982fd23d1427306d84",
+    "horizon-bold.json": "6bbbe370e597620c84dd2ccbd63052f35f0bef4e247a7caea4644ec7ec3e5f34",
+    "horizon-bright-bold.json": "4be2aca332b3c179cc65d743fbda822785f1e60ea802f5feafc584c8ce7afef0",
+    "horizon-bright-italic.json": "b79c4164d4168ddb608aa95c761e24170fdc04b02f9aaadb6dd9d8870ce426ed",
+    "horizon-bright.json": "959086241d54978c435d2f460c1db69cde91b57e7692da866c11c3065043da18",
+    "horizon-italic.json": "5268efe8fb4c10fcf6b162297f328f3277c0411c6deda28e88458cb4daeb7380",
+    "horizon.json": "94ff253e0d9d6b19565b90799baa9b355075c58c92ab4f323828c7898bd0104e",
+    "package.json": "cc3e3c6166cc1ad3bc1526ac6ebbdc7410c2dcef88533a5a9eb9c26d72f593c1"
+  }
+}

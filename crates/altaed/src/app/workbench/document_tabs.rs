@@ -232,8 +232,8 @@ impl Ide {
         self.session.documents.insert(to, document);
         let view = self.views.remove(from);
         self.views.insert(to, view);
-        let edits = self.edits.remove(from);
-        self.edits.insert(to, edits);
+        let observers = self.document_observers.remove(from);
+        self.document_observers.insert(to, observers);
         self.session.active = if active == from {
             to
         } else if from < active && active <= to {

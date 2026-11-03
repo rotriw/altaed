@@ -221,6 +221,51 @@ mod tests {
     use crate::{app::Ide, session::Session};
     use std::sync::Arc;
     #[gpui::test]
+    fn dev_cpp_function_keys_dispatch_while_editing(cx: &mut gpui::TestAppContext) {
+        use gpui::Focusable;
+        use std::{cell::Cell, rc::Rc};
+        let calls = Rc::new(Cell::new([0; 3]));
+        cx.update(|cx| {
+            let store = settings::SettingsStore::test(cx);
+            cx.set_global(store);
+            assets::Assets.load_test_fonts(cx);
+            theme::init(theme::LoadThemes::JustBase, cx);
+            editor::init(cx);
+            init(&AppPreferences::default(), cx).unwrap();
+            let compiled = calls.clone();
+            cx.on_action(move |_: &crate::app::CompileDocument, cx| {
+                let mut counts = compiled.get();
+                counts[0] += 1;
+                compiled.set(counts);
+                cx.stop_propagation();
+            });
+            let ran = calls.clone();
+            cx.on_action(move |_: &crate::app::RunCompiled, cx| {
+                let mut counts = ran.get();
+                counts[1] += 1;
+                ran.set(counts);
+                cx.stop_propagation();
+            });
+            let combined = calls.clone();
+            cx.on_action(move |_: &crate::app::CompileAndRun, cx| {
+                let mut counts = combined.get();
+                counts[2] += 1;
+                combined.set(counts);
+                cx.stop_propagation();
+            });
+        });
+        let (editor, cx) = cx.add_window_view(editor::Editor::single_line);
+        cx.update(|window, cx| window.focus(&editor.focus_handle(cx), cx));
+        for (key, expected) in [("f9", [1, 0, 0]), ("f10", [1, 1, 0]), ("f11", [1, 1, 1])] {
+            cx.simulate_keystrokes(key);
+            assert_eq!(
+                calls.get(),
+                expected,
+                "{key} must dispatch exactly its configured command"
+            );
+        }
+    }
+    #[gpui::test]
     fn rebinding_disables_old_keys_and_rejects_conflicts(cx: &mut gpui::TestAppContext) {
         let mut preferences = AppPreferences::default();
         preferences.language_server.enabled = false;

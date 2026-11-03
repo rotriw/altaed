@@ -1,7 +1,9 @@
-# 右侧测试栏布局原型
+# 测试栏网页验收
 
-运行：`python3 -m http.server 4318 --bind 127.0.0.1 --directory prototypes/test-panel`，打开 http://127.0.0.1:4318/ 。此原型用于原生应用结构验证，结果为明确标注的演示，源码不执行。
+运行 `python3 -m http.server 4321 --bind 127.0.0.1 --directory prototypes/test-panel`，打开 http://127.0.0.1:4321/ 。这是本地应用的交互布局原型，数据和运行结果明确为演示，不编译代码，也不读取或执行导入的比较器。
 
-参考 CP Editor 官方界面：https://cpeditor.org/img/banner/home-center-2.jpg 。上方运行信息、下方测试数据独立分隔；输入／实际输出／预期输出并排。可拖动两条分隔线，键盘聚焦后可用方向键调整，文本框正常 Enter 换行。控件 hover 只改变文字或细线，不使用阴影和灰色背景块。
+按 CP Editor 的 titleLayout / checkerLayout / scrollArea 排列：运行信息、测试标题、比较器行、用例列表。默认八种比较规则并保留自定义浮点配置。参数就地展开，长文件名截断并保留完整提示；每份代码的配置隔离。
 
-已验证：Enter 输入多行；载入500例时DOM仅有当前4行、12个文本框；行数随视口变化。Impeccable layout 扫描未报告检测项，不能替代用户体验评价。原生复现见 `crates/altaed/src/app/test_editors.rs`、`crates/altaed/src/app/workbench.rs` 与 `crates/altaed/src/text_field.rs`。
+每例为输入、实际输出、预期输出三列。预期为空只观察，有内容自动比较，没有复选框；实际输出标题不再附加“只读”。用例196px高。宽度与运行信息分隔线可拖动或用方向键调整；500例按可见范围创建控件。
+
+2026-11-03 用户已验收并授权迁移；原生使用同一固定桌面结构，不迁移网页的响应式断点。Impeccable 截图与检查记录位于 `.impeccable/review/checker-layout/`；检测器对固定高度桌面标题栏、状态栏给出 padding / 11px 提示，这些需要结合实际垂直居中和已认可的桌面密度判断，不能视为零问题报告。

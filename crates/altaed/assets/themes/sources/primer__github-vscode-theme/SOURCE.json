@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/primer/github-vscode-theme",
+  "revision": "cd78e5e4e7bcf132a6f428ae0f32264bb1b729cf",
+  "files": [
+    "package.json",
+    "LICENSE"
+  ],
+  "distribution": {
+    "version": "6.3.5",
+    "url": "https://GitHub.gallery.vsassets.io/_apis/public/gallery/publisher/GitHub/extension/github-vscode-theme/6.3.5/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage",
+    "sha256": "74e69da1804f718ae9ce6a8ea49c06fbf9cfc137c9b65b0e14353715cb5d474a"
+  },
+  "sha256": {
+    "LICENSE": "e2c871bb6effe9f6ec8d94d6596db33c4bfe4dd94969a6a9a2fb0473ebe6442e",
+    "dark-default.json": "a81623253b9441beef340f9417fa02e668b54ad7238735b5db72de6fd1eae9ba",
+    "light-default.json": "cc0cf47f4089eab798a72c600c08eff05246abb0c233d37dabd02afb255fccfb",
+    "package.json": "60b15b3e62eba9d8e16ce2551d52277dfdd1fde47a4ac883caa0c0f0d5f2cd3d"
+  }
+}

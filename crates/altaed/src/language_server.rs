@@ -7,6 +7,22 @@ use std::path::PathBuf;
 
 pub const CLANGD_PROGRAM: &str = "clangd";
 const MAX_TIMEOUT_MS: u64 = 300_000;
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct InlayHintSettings {
+    pub enabled: bool,
+    pub parameters: bool,
+    pub types: bool,
+}
+impl Default for InlayHintSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            parameters: true,
+            types: true,
+        }
+    }
+}
 // clangd's automatic fallback is lexical while its first preamble is building.
 // Prefer semantic results and explicit overloads for reliable snippet arguments.
 // Advanced user arguments with the same option name always take precedence.

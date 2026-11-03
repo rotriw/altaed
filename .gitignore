@@ -17,3 +17,6 @@
 .env
 .env.*
 !.env.example
+
+# Generated portable deliveries are published as CI artifacts.
+/dist/

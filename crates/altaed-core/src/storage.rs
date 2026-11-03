@@ -5,7 +5,11 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-const FORMAT_VERSION: u32 = 1;
+// V2 added structured problems; V3 added typed compiler switches.
+// V4 added sample file links; V5 adds native checkers and trailing-space policy.
+// Older binaries must reject new records instead of silently evaluating with a
+// different checker or using inline fallback text for a linked file.
+const FORMAT_VERSION: u32 = 5;
 #[derive(Serialize, Deserialize)]
 struct Envelope<T> {
     version: u32,
@@ -57,7 +61,7 @@ pub(crate) fn write_value<T: Serialize>(path: &Path, value: &T) -> Result<()> {
 }
 pub(crate) fn read_value<T: DeserializeOwned>(path: &Path) -> Result<T> {
     let record: Envelope<T> = serde_json::from_slice(&fs::read(path)?)?;
-    if record.version != FORMAT_VERSION {
+    if !(1..=FORMAT_VERSION).contains(&record.version) {
         bail!("unsupported storage version {}", record.version);
     }
     Ok(record.value)

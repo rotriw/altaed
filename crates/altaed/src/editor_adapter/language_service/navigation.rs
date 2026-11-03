@@ -27,6 +27,10 @@ impl LanguageService {
             !self.preparing && matches!(self.phase, Phase::Ready),
             "语言服务尚未就绪"
         );
+        // Automatic completion runs inside the input callback, before GPUI
+        // delivers BufferEvent::Edited. Observe the actual snapshot first;
+        // the later event must not invalidate this same edit a second time.
+        self.observe_buffer_edits(id, cx)?;
         self.flush_change(id, cx)?;
         let document = self.documents.get(&id).context("语言服务文档已关闭")?;
         let server = self

@@ -70,6 +70,7 @@ def main():
                 "general": {"positionEncodings": ["utf-16"]}, "textDocument": {
                     "completion": {"completionItem": {"snippetSupport": True, "insertReplaceSupport": True,
                         "labelDetailsSupport": True, "resolveSupport": {"properties": ["documentation", "detail"]}}},
+                    "inlayHint": {"dynamicRegistration": False},
                     "signatureHelp": {"signatureInformation": {"parameterInformation": {"labelOffsetSupport": True},
                         "activeParameterSupport": True}}}}})
             client.send("initialized", {})
@@ -104,14 +105,23 @@ def main():
             push = next(item for item in members if "push_back" in item["label"])
             assert push.get("insertTextFormat") == 2 and "${" in str(push), push
             assert not push.get("additionalTextEdits"), push
+            text = prefix + "int main() { /*🙂*/ auto answer = combine(4, 1.5); return answer; }"
+            client.send("textDocument/didChange", {"textDocument": dict(document, version=4), "contentChanges": [{"text": text}]})
+            assert initialized.get("capabilities", {}).get("inlayHintProvider"), initialized
+            hints = client.request("textDocument/inlayHint", {"textDocument": document, "range": {
+                "start": {"line": 0, "character": 0}, "end": {"line": text.count("\n"),
+                "character": len(text.rsplit("\n", 1)[-1].encode("utf-16-le")) // 2}}})
+            assert any(hint.get("kind") == 1 and "double" in str(hint["label"]) for hint in hints), hints
+            for parameter in ("count", "weight"):
+                assert any(hint.get("kind") == 2 and parameter in str(hint["label"]) for hint in hints), hints
             client.request("shutdown", None)
             client.send("exit", None)
             evidence = {"server": initialized.get("serverInfo"), "unmaterialized_source": not source.exists(),
                 "function_completion": function, "resolve_supported": can_resolve, "documentation": resolved.get("documentation"),
-                "signature_help": signature, "member_snippet": push}
+                "signature_help": signature, "member_snippet": push, "inlay_hints": hints}
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
-            print("Real clangd: Unicode completion, documentation, second-parameter signature and member snippet passed.")
+            print("Real clangd: Unicode completion, documentation, signature, member snippet and type/parameter inlay hints passed.")
         finally:
             process.terminate()
             try:

@@ -1,10 +1,10 @@
-#![cfg_attr(
-    all(target_os = "windows", not(debug_assertions)),
-    windows_subsystem = "windows"
-)]
+// Both development and release GUI binaries start without a companion console.
+// Keep the test harness on the console subsystem so its output remains visible.
+#![cfg_attr(all(target_os = "windows", not(test)), windows_subsystem = "windows")]
 
 mod app;
 mod app_assets;
+mod color_theme;
 mod configuration;
 mod editor_adapter;
 mod keymap;
@@ -13,7 +13,9 @@ mod panel_style;
 mod startup_error;
 mod text_field;
 mod workbench_layout;
-use altaed_core::{atomic_file, checker, document, platform, runner, session, storage, toolchain};
+use altaed_core::{
+    atomic_file, checker, companion, document, platform, runner, session, storage, toolchain,
+};
 use anyhow::{Context as _, Result};
 use gpui::{App, actions};
 use language::{Language, LanguageQueries};
@@ -25,7 +27,7 @@ fn start(cx: &mut App) -> Result<()> {
     assets::Assets.load_fonts(cx)?;
     let settings = SettingsStore::new(cx, &settings::default_settings());
     cx.set_global(settings);
-    theme::init(theme::LoadThemes::All(Box::new(assets::Assets)), cx);
+    theme::init(theme::LoadThemes::All(Box::new(app_assets::Assets)), cx);
     editor::init(cx);
     let directory = storage::data_directory()?;
     let loaded = configuration::load_or_create(&directory)?;
@@ -35,6 +37,7 @@ fn start(cx: &mut App) -> Result<()> {
             directory.join(configuration::FILE_NAME).display()
         );
     }
+    color_theme::apply(&loaded.preferences.editor.theme, cx)?;
     keymap::init(&loaded.preferences, cx).with_context(|| {
         format!(
             "无法加载 {}",
@@ -102,7 +105,7 @@ fn start(cx: &mut App) -> Result<()> {
             ],
         },
     ]);
-    cx.on_action(|_: &Quit, cx| cx.quit());
+    cx.on_action(|_: &Quit, cx| app::request_quit(cx));
     cx.on_window_closed(|cx| {
         if cx.windows().is_empty() {
             cx.quit();
@@ -127,7 +130,12 @@ fn start(cx: &mut App) -> Result<()> {
     cpp.set_theme(cx.theme().syntax());
     let mut session = storage::load_session(&directory)?;
     let preferences = loaded.preferences;
-    session.ensure_document();
+    if session.documents.is_empty() {
+        let document = document::CodeDocument::untitled_with_settings(
+            preferences.toolchain.new_document_settings(),
+        );
+        session.documents.push(document);
+    }
     app::launch(session, directory, cpp, preferences, cx)?;
     cx.activate(true);
     Ok(())

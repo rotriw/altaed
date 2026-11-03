@@ -4,7 +4,6 @@
     "width": 960,
     "height": 700,
     "sidebar": 192,
-    "header": 56,
     "footer": 52,
     "content_padding": 32,
     "section_header": 36,
@@ -19,9 +18,19 @@
       "description": "统一设置所有代码编辑器的显示方式。"
     },
     {
+      "id": "core.inlay",
+      "label": "行内提示",
+      "description": "由 clangd 提供，显示在代码之间，不修改或保存到源码。"
+    },
+    {
       "id": "core.toolchain",
       "label": "编译环境",
       "description": "软件默认编译器；文档可单独覆盖。"
+    },
+    {
+      "id": "core.cpp_defaults",
+      "label": "C++ 编译选项",
+      "description": "新建和导入文档使用的默认值；已有代码在“文档运行配置”中单独修改。"
     },
     {
       "id": "core.lsp",
@@ -32,9 +41,82 @@
       "id": "core.workbench",
       "label": "工作台",
       "description": "设置应用启动时的面板布局。"
+    },
+    {
+      "id": "core.import",
+      "label": "题目导入",
+      "description": "接收 Competitive Companion 浏览器扩展发送的题目与样例。"
     }
   ],
   "settings": [
+    {
+      "id": "core.editor.theme",
+      "category": "core.editor",
+      "label": "颜色主题",
+      "description": "应用于代码编辑器与整个工作台。",
+      "kind": "choice",
+      "presentation": "dropdown",
+      "default": "default-light",
+      "options": [
+        {
+          "value": "default-dark",
+          "label": "默认深色 (Dark)"
+        },
+        {
+          "value": "default-light",
+          "label": "默认浅色 (Light)"
+        },
+        {
+          "value": "monokai",
+          "label": "Monokai"
+        },
+        {
+          "value": "github-light",
+          "label": "GitHub Light"
+        },
+        {
+          "value": "github-dark",
+          "label": "GitHub Dark"
+        },
+        {
+          "value": "solarized-light",
+          "label": "Solarized Light"
+        },
+        {
+          "value": "solarized-dark",
+          "label": "Solarized Dark"
+        },
+        {
+          "value": "dracula",
+          "label": "Dracula"
+        },
+        {
+          "value": "horizon",
+          "label": "Horizon"
+        },
+        {
+          "value": "horizon-italic",
+          "label": "Horizon Italic"
+        },
+        {
+          "value": "horizon-bold",
+          "label": "Horizon Bold"
+        },
+        {
+          "value": "horizon-bright",
+          "label": "Horizon Bright"
+        },
+        {
+          "value": "horizon-bright-italic",
+          "label": "Horizon Bright Italic"
+        },
+        {
+          "value": "horizon-bright-bold",
+          "label": "Horizon Bright Bold"
+        }
+      ],
+      "control_width": 280
+    },
     {
       "id": "core.editor.font_family",
       "category": "core.editor",
@@ -73,6 +155,14 @@
       "description": "长行按编辑区宽度折行，不修改文件内容。",
       "kind": "toggle",
       "default": false
+    },
+    {
+      "id": "core.editor.auto_completions",
+      "category": "core.editor",
+      "label": "输入时代码补全",
+      "description": "输入标识符、成员访问和作用域符号时自动显示候选项；关闭后仍可用“代码补全”快捷键调用。",
+      "kind": "toggle",
+      "default": true
     },
     {
       "id": "core.editor.auto_signature_help",
@@ -115,6 +205,64 @@
       "default": "",
       "placeholder": "自动查找 clang++ / g++ / c++",
       "control_width": 520
+    },
+    {
+      "id": "core.toolchain.cpp_standard",
+      "category": "core.cpp_defaults",
+      "label": "C++ 标准",
+      "description": "新建代码使用的 C++ 标准；不修改已有文档。",
+      "kind": "choice",
+      "default": "default",
+      "options": []
+    },
+    {
+      "id": "core.toolchain.optimization",
+      "category": "core.cpp_defaults",
+      "label": "优化级别",
+      "description": "选择后覆盖附加参数中的 -O 选项；沿用时保留原有参数。",
+      "kind": "choice",
+      "default": "inherit",
+      "options": []
+    },
+    {
+      "id": "core.toolchain.warnings",
+      "category": "core.cpp_defaults",
+      "label": "常用警告",
+      "description": "加入 -Wall 和 -Wextra，帮助发现可疑代码。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
+      "id": "core.toolchain.debug_info",
+      "category": "core.cpp_defaults",
+      "label": "调试信息",
+      "description": "加入 -g，保留调试器和错误报告所需的符号。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
+      "id": "core.toolchain.address_sanitizer",
+      "category": "core.cpp_defaults",
+      "label": "内存错误检查",
+      "description": "加入 AddressSanitizer，检测越界和释放后使用；需要编译器及运行库支持。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
+      "id": "core.toolchain.undefined_sanitizer",
+      "category": "core.cpp_defaults",
+      "label": "未定义行为检查",
+      "description": "加入 UndefinedBehaviorSanitizer，检测有符号溢出等问题；需要工具链支持。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
+      "id": "core.toolchain.arguments",
+      "category": "core.cpp_defaults",
+      "label": "附加编译参数",
+      "description": "每行一个参数，无需 shell 引号。支持 -D 宏、-I 头文件目录等；启用的上方选项会在这些参数基础上生效。",
+      "kind": "multiline",
+      "default": "-O2"
     },
     {
       "id": "core.workbench.reduce_motion",
@@ -173,6 +321,77 @@
       "default": "5000",
       "control_width": 160,
       "max": 300000
+    },
+    {
+      "id": "core.import.enabled",
+      "category": "core.import",
+      "label": "浏览器题目导入",
+      "description": "仅监听本机回环地址；每次导入新建独立代码文档并保存样例。",
+      "kind": "toggle",
+      "default": true
+    },
+    {
+      "id": "core.import.port",
+      "category": "core.import",
+      "label": "导入端口",
+      "description": "默认 27121 是 Companion 已支持的端口。使用扩展默认列表之外的端口时，需在浏览器扩展的 Custom ports 中添加。",
+      "kind": "integer",
+      "default": 27121,
+      "min": 1,
+      "max": 65535,
+      "control_width": 180
+    },
+    {
+      "id": "core.inlay.enabled",
+      "category": "core.inlay",
+      "label": "C++ 行内提示",
+      "description": "默认关闭。需要时开启，显示 clangd 的真实语义结果，不修改源码。",
+      "kind": "toggle",
+      "default": false
+    },
+    {
+      "id": "core.inlay.parameters",
+      "category": "core.inlay",
+      "label": "参数名称",
+      "description": "在函数调用参数旁显示名称，便于辨认字面值的含义。",
+      "kind": "toggle",
+      "default": true,
+      "visible_when": {
+        "id": "core.inlay.enabled",
+        "value": "true"
+      }
+    },
+    {
+      "id": "core.inlay.types",
+      "category": "core.inlay",
+      "label": "推导类型",
+      "description": "在 auto 等推导声明旁显示实际类型。",
+      "kind": "toggle",
+      "default": true,
+      "visible_when": {
+        "id": "core.inlay.enabled",
+        "value": "true"
+      }
+    },
+    {
+      "id": "core.workbench.compiling_color",
+      "category": "core.workbench",
+      "label": "编译时底色",
+      "description": "留空时采用当前主题的柔和底色，也可输入 #RRGGBB 自定义。结束后恢复常态。",
+      "kind": "color",
+      "default": "",
+      "control_width": 180,
+      "placeholder": "留空跟随主题"
+    },
+    {
+      "id": "core.workbench.running_color",
+      "category": "core.workbench",
+      "label": "运行时底色",
+      "description": "留空时采用当前主题的柔和底色，也可输入 #RRGGBB 自定义。结束后恢复常态。",
+      "kind": "color",
+      "default": "",
+      "control_width": 180,
+      "placeholder": "留空跟随主题"
     }
   ]
 }

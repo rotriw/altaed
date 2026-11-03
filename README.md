@@ -5,11 +5,11 @@
 ## Monorepo
 
 - `crates/altaed`：原生 IDE、工作台、设置、快捷键和编辑器／clangd 适配。
-- `crates/altaed-core`：文档身份、会话、持久化、工具链、编译运行与 checker；不依赖 GPUI/Zed。
+- `crates/altaed-core`：文档身份、题目模型与 Companion 接收、会话、持久化、工具链、编译运行与 checker；不依赖 GPUI/Zed。
 - `vendor/zed-source.json`：固定第三方 revision；准备脚本将源码和窄扩展放入忽略的 `vendor/zed`。
 - `prototypes/`：已讨论的网页界面原型，不作为 IDE 运行时。
 
-当前集成真实 clangd 补全、函数参数提示、诊断和定义导航。源文件、样例、运行配置属于各自 DocumentId。全局软件配置与文档运行配置分开。云存储、Competitive Companion 正式导入、插件远程提交与 CF 中继仍待实现。
+当前集成真实 clangd 输入补全、函数参数提示、诊断和定义导航，可按需开启参数名与类型行内提示。支持可配置的 C++ 编译选项，以及浏览器 Competitive Companion 导入题目与样例，每次导入创建独立文档。源文件、题目信息、样例、运行配置属于各自 DocumentId。全局软件配置与文档运行配置分开。云存储、插件远程提交与 CF 中继仍待实现。
 
 ## 构建
 
@@ -36,6 +36,9 @@ macOS 需要 Xcode 及 Metal 工具。Windows 完整构建需要 MSVC Build Tool
 - [产品范围](PRODUCT.md) 与 [迭代计划](docs/ide-plan.md)
 - [Crate 边界](docs/monorepo.md)
 - [软件配置与快捷键](docs/configuration.md)
+- [题目模型与浏览器导入](docs/problem-import.md)
+- [C++ 编译器与编译选项](docs/cpp-toolchains.md)
+- [样例文件与输出差异](docs/test-data.md)
 - [真实语言服务与验证范围](docs/lsp.md)
 - [资源侧栏](docs/sidebar.md)
 - [编辑器独立性研究](docs/editor-sdk.md)

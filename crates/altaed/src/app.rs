@@ -1,11 +1,23 @@
+mod checker_selection;
 mod configuration_commands;
 mod execution;
+mod imports;
 mod language_intelligence;
+mod output_diff;
+mod sample_editor;
 pub(crate) mod settings_window;
 mod startup;
+mod status_bar;
 mod test_editors;
+mod title_bar;
 mod welcome;
+mod window_chrome;
 pub(crate) use startup::launch;
+pub(crate) fn request_quit(cx: &mut gpui::App) {
+    if !sample_editor::prevent_quit(cx) {
+        cx.quit();
+    }
+}
 mod workbench;
 
 use crate::{
@@ -61,7 +73,38 @@ impl StatusMessage {
     }
 }
 
+struct DocumentObservers {
+    _buffer: Subscription,
+    _selection: Subscription,
+}
+fn observe_document(id: DocumentId, view: &EditorView, cx: &mut Context<Ide>) -> DocumentObservers {
+    DocumentObservers {
+        _buffer: cx.subscribe(&view.buffer, move |this, buffer, event, cx| {
+            if matches!(event, language::BufferEvent::Edited) {
+                if let Some(document) = this
+                    .session
+                    .documents
+                    .iter_mut()
+                    .find(|document| document.id == id)
+                {
+                    document.text = buffer.read(cx).text();
+                }
+                this.mark_changed(id);
+                cx.notify();
+            }
+        }),
+        _selection: cx.subscribe(&view.editor, move |this, _, event, cx| {
+            if matches!(event, editor::EditorEvent::SelectionsChanged { .. })
+                && this.session.documents[this.session.active].id == id
+            {
+                cx.notify();
+            }
+        }),
+    }
+}
+
 pub struct Ide {
+    imports: imports::ImportState,
     pub(crate) preferences: crate::configuration::AppPreferences,
     preferences_pending: bool,
     preferences_loaded: bool,
@@ -71,6 +114,7 @@ pub struct Ide {
     navigation_request: u64,
     tabs_scroll: gpui::ScrollHandle,
     tab_auto_scroll: Option<gpui::Task<()>>,
+    window_chrome: gpui::Entity<window_chrome::WindowChrome>,
     tab_visibility: Option<(crate::document::DocumentId, usize, gpui::Pixels)>,
     _window_bounds: Subscription,
     preferences_saving: bool,
@@ -79,11 +123,12 @@ pub struct Ide {
         std::collections::BTreeMap<usize, test_editors::TestEditors>,
     >,
     runs: execution::Runs,
+    checker_controls: std::collections::HashMap<DocumentId, checker_selection::CheckerControls>,
     layout: WorkbenchLayout,
     sidebar: workbench::sidebar::SidebarState,
     session: Session,
     views: Vec<EditorView>,
-    edits: Vec<Subscription>,
+    document_observers: Vec<DocumentObservers>,
     directory: PathBuf,
     checkpoints: Arc<storage::SessionStore>,
     language: Arc<Language>,
@@ -107,6 +152,15 @@ impl Ide {
             self.status = StatusMessage::General(format!("快捷键未应用：{error:#}"));
             cx.notify();
             return;
+        }
+        if self.preferences.editor.theme != next.editor.theme {
+            if let Err(error) = crate::color_theme::apply(&next.editor.theme, cx) {
+                self.status = StatusMessage::General(format!("主题未应用：{error:#}"));
+                cx.notify();
+                return;
+            }
+            use theme::ActiveTheme;
+            self.language.set_theme(cx.theme().syntax());
         }
         if self.preferences.workbench.documents != next.workbench.documents {
             self.layout.documents_visible = next.workbench.documents;
@@ -136,28 +190,16 @@ impl Ide {
             .iter()
             .map(|d| EditorView::new(d.text.clone(), language.clone(), window, cx))
             .collect();
-        let edits = views
+        let document_observers = views
             .iter()
             .zip(&session.documents)
-            .map(|(view, document)| {
-                let id = document.id;
-                cx.subscribe(&view.buffer, move |this, buffer, event, cx| {
-                    if matches!(event, language::BufferEvent::Edited) {
-                        if let Some(doc) =
-                            this.session.documents.iter_mut().find(|doc| doc.id == id)
-                        {
-                            doc.text = buffer.read(cx).text();
-                        }
-                        this.mark_changed(id);
-                        cx.notify();
-                    }
-                })
-            })
+            .map(|(view, document)| observe_document(document.id, view, cx))
             .collect();
         window.focus(&views[session.active].editor.focus_handle(cx), cx);
         let checkpoints = Arc::new(storage::SessionStore::new(directory.clone()));
         let window_bounds = cx.observe_window_bounds(window, |_, _, cx| cx.notify());
         let quit = cx.on_app_quit(|this, cx| {
+            this.imports.server.take();
             for run in this.runs.values() {
                 run.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
             }
@@ -175,6 +217,7 @@ impl Ide {
             })
         });
         Self {
+            imports: Default::default(),
             sidebar: Default::default(),
             preferences: Default::default(),
             preferences_pending: true,
@@ -185,14 +228,16 @@ impl Ide {
             tabs_scroll: gpui::ScrollHandle::new(),
             tab_auto_scroll: None,
             tab_visibility: None,
+            window_chrome: cx.new(|_| window_chrome::WindowChrome::new()),
             _window_bounds: window_bounds,
             preferences_saving: false,
             test_editors: Default::default(),
             runs: Default::default(),
+            checker_controls: Default::default(),
             layout: WorkbenchLayout::default(),
             session,
             views,
-            edits,
+            document_observers,
             directory,
             checkpoints,
             language,
@@ -230,23 +275,21 @@ impl Ide {
         window.focus(&view.editor.focus_handle(cx), cx);
         self.session.active = self.views.len();
         let id = document.id;
-        self.edits
-            .push(cx.subscribe(&view.buffer, move |this, buffer, event, cx| {
-                if matches!(event, language::BufferEvent::Edited) {
-                    if let Some(doc) = this.session.documents.iter_mut().find(|doc| doc.id == id) {
-                        doc.text = buffer.read(cx).text();
-                    }
-                    this.mark_changed(id);
-                    cx.notify();
-                }
-            }));
+        self.document_observers
+            .push(observe_document(id, &view, cx));
         self.views.push(view);
         self.session.documents.push(document);
         self.sync_language_service(cx);
         cx.notify();
     }
+    fn blank_document(&self) -> CodeDocument {
+        let document = CodeDocument::untitled_with_settings(
+            self.preferences.toolchain.new_document_settings(),
+        );
+        document
+    }
     fn new_document(&mut self, _: &NewDocument, window: &mut Window, cx: &mut Context<Self>) {
-        self.append(CodeDocument::untitled(), window, cx);
+        self.append(self.blank_document(), window, cx);
     }
     fn open_document(&mut self, _: &OpenDocument, window: &mut Window, cx: &mut Context<Self>) {
         let paths = cx.prompt_for_paths(PathPromptOptions {
@@ -355,11 +398,11 @@ impl Ide {
         let active = self.session.active;
         self.test_editors.remove(&self.session.documents[index].id);
         self.views.remove(index);
-        drop(self.edits.remove(index));
+        drop(self.document_observers.remove(index));
         self.session.documents.remove(index);
         self.sync_language_service(cx);
         if self.views.is_empty() {
-            self.append(CodeDocument::untitled(), window, cx);
+            self.append(self.blank_document(), window, cx);
         } else {
             // Closing an inactive tab must not replace the document being edited.
             self.session.active = if active == index {

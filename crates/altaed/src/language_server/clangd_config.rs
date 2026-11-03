@@ -59,7 +59,7 @@ impl DocumentPlan {
         };
         let resolved = toolchain::find_executable(compiler);
         let mut arguments = vec![text_path(resolved.as_deref().unwrap_or(compiler))?];
-        arguments.extend(settings.compiler_arguments.iter().cloned());
+        arguments.extend(settings.effective_compiler_arguments());
         if let Some(parent) = document.path.as_ref().and_then(|path| path.parent()) {
             // Shadow files keep document identity private, while quoted local
             // headers still resolve beside the user's actual source file.
@@ -90,6 +90,10 @@ mod tests {
         let root = std::env::temp_dir().join(format!("altaed-lsp-plan-{}", uuid::Uuid::new_v4()));
         let mut first = CodeDocument::untitled();
         first.metadata.settings.compiler_arguments = vec!["-std=c++20".into(), "-DFIRST=1".into()];
+        first.metadata.settings.cpp_standard = crate::toolchain::CppStandard::Cpp11;
+        first.metadata.settings.compiler_options.optimization =
+            crate::toolchain::Optimization::Debug;
+        first.metadata.settings.compiler_options.warnings = true;
         let second = first.fork(std::env::temp_dir().join("second.cpp"));
         let first_plan = DocumentPlan::build(&first, &root, Some(Path::new("clang++")))?;
         let second_plan = DocumentPlan::build(&second, &root, Some(Path::new("clang++")))?;
@@ -99,7 +103,31 @@ mod tests {
             first_plan
                 .command
                 .compilation_command
+                .contains(&"-std=c++11".into())
+        );
+        assert!(
+            !first_plan
+                .command
+                .compilation_command
+                .contains(&"-std=c++20".into())
+        );
+        assert!(
+            first_plan
+                .command
+                .compilation_command
                 .contains(&"-DFIRST=1".into())
+        );
+        assert!(
+            first_plan
+                .command
+                .compilation_command
+                .contains(&"-Og".into())
+        );
+        assert!(
+            first_plan
+                .command
+                .compilation_command
+                .contains(&"-Wextra".into())
         );
         assert!(
             second_plan

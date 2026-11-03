@@ -191,6 +191,48 @@ impl Welcome {
                                     ),
                             ),
                     )
+                    .when_some(self.verified.as_ref(), |page, compiler| {
+                        let mut choices = div().flex().flex_wrap().gap(px(4.));
+                        for &standard in &compiler.standards {
+                            let selected = self.cpp_standard == standard;
+                            choices = choices.child(
+                                button(
+                                    format!("welcome-standard-{}", standard.value()),
+                                    standard.label(),
+                                    26.,
+                                    palette,
+                                )
+                                .px(px(8.))
+                                .border_color(if selected {
+                                    palette.accent
+                                } else {
+                                    palette.line
+                                })
+                                .text_color(if selected {
+                                    palette.accent
+                                } else {
+                                    palette.text
+                                })
+                                .on_click(cx.listener(
+                                    move |this, _, _, cx| {
+                                        if !this.busy {
+                                            this.cpp_standard = standard;
+                                            cx.notify();
+                                        }
+                                    },
+                                )),
+                            );
+                        }
+                        page.child(
+                            div()
+                                .mt(px(8.))
+                                .flex()
+                                .items_center()
+                                .gap(px(10.))
+                                .child(div().flex_shrink_0().child("C++ 标准"))
+                                .child(choices),
+                        )
+                    })
                     .child(
                         div()
                             .min_h(px(40.))

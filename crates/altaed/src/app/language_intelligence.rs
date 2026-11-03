@@ -32,6 +32,7 @@ impl Ide {
             service.synchronize(
                 bindings,
                 self.preferences.language_server.clone(),
+                self.preferences.editor.inlay_hints.clone(),
                 self.preferences.toolchain.compiler_path.clone(),
                 cx,
             )

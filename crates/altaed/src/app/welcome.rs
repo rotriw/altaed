@@ -93,7 +93,8 @@ struct Welcome {
     shortcuts: Vec<ShortcutInput>,
     shortcut_errors: BTreeMap<String, String>,
     shortcut_message: String,
-    verified: Option<PathBuf>,
+    verified: Option<crate::toolchain::CompilerCapabilities>,
+    cpp_standard: crate::toolchain::CppStandard,
     probe_cancel: Option<Arc<AtomicBool>>,
     probe_generation: u64,
     busy: bool,
@@ -138,7 +139,7 @@ impl Welcome {
             // Verification applies only to the exact compiler the user tested.
             this.verified = None;
             this.error = false;
-            this.message = "检测将编译并运行一段 C++20 程序。".into();
+            this.message = "检测编译器版本、可用标准与程序执行。".into();
             cx.notify();
         });
         let shortcuts = EXECUTION_COMMANDS
@@ -170,6 +171,7 @@ impl Welcome {
         window.focus(&focus, cx);
         let animate =
             !startup.preferences.workbench.reduce_motion && !crate::platform::reduce_motion();
+        let cpp_standard = startup.preferences.toolchain.default_cpp_standard;
         Self {
             startup,
             layout,
@@ -181,12 +183,13 @@ impl Welcome {
             shortcut_errors: BTreeMap::new(),
             shortcut_message: String::new(),
             verified: None,
+            cpp_standard,
             probe_cancel: None,
             probe_generation: 0,
             busy: false,
             saving: false,
             error: false,
-            message: "检测将编译并运行一段 C++20 程序。".into(),
+            message: "检测编译器版本、可用标准与程序执行。".into(),
             animate,
         }
     }
@@ -250,7 +253,7 @@ impl Welcome {
         self.probe_generation += 1;
         self.verified = None;
         self.error = false;
-        self.message = "检测将编译并运行一段 C++20 程序。".into();
+        self.message = "检测编译器版本、可用标准与程序执行。".into();
         self.set_busy(false, cx);
         self.show_page(Page::Shortcuts, window, cx);
     }
@@ -338,9 +341,12 @@ impl Welcome {
                 this.probe_cancel = None;
                 this.set_busy(false, cx);
                 match result {
-                    Ok(path) => {
-                        this.verified = Some(path);
-                        this.message = "环境已就绪 · C++20 编译和执行检测通过。".into();
+                    Ok(capabilities) => {
+                        if !capabilities.standards.contains(&this.cpp_standard) {
+                            this.cpp_standard = Default::default();
+                        }
+                        this.message = capabilities.version.clone();
+                        this.verified = Some(capabilities);
                     }
                     Err(error) => {
                         this.error = true;
@@ -357,7 +363,8 @@ impl Welcome {
             return;
         }
         let mut next = self.startup.preferences.clone();
-        next.toolchain.compiler_path = self.verified.clone();
+        next.toolchain.compiler_path = self.verified.as_ref().map(|compiler| compiler.path.clone());
+        next.toolchain.default_cpp_standard = self.cpp_standard;
         next.toolchain.setup_complete = true;
         for input in &self.shortcuts {
             next.keybindings.insert(
@@ -394,6 +401,17 @@ impl Welcome {
                 this.set_busy(false, cx);
                 match result {
                     Ok(next) => {
+                        if this.verified.is_some() {
+                            for document in &mut this.startup.session.documents {
+                                if document.path.is_none()
+                                    && document.text.is_empty()
+                                    && document.metadata.settings
+                                        == crate::document::DocumentSettings::default()
+                                {
+                                    document.metadata.settings.cpp_standard = this.cpp_standard;
+                                }
+                            }
+                        }
                         this.startup.preferences = next;
                         match this.startup.open_ide(cx) {
                             Ok(()) => window.remove_window(),

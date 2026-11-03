@@ -42,7 +42,11 @@ impl SettingsWindow {
                     .text_color(palette.muted)
                     .child(setting.description.clone()),
             );
-        let control = if setting.kind == Kind::Choice {
+        let control = if setting.kind == Kind::Choice
+            && setting.presentation == crate::configuration::schema::ChoicePresentation::Dropdown
+        {
+            self.choice_dropdown(setting, cx)
+        } else if setting.kind == Kind::Choice {
             let mut choices = div().flex().flex_wrap().gap(px(8.));
             for choice in &setting.options {
                 let id = setting.id.clone();
@@ -113,7 +117,7 @@ impl SettingsWindow {
         } else {
             let field = self.ensure_input(setting, window, cx);
             let focus = field.focus_handle(cx);
-            div()
+            let input = div()
                 .id(format!("input-{}", setting.id))
                 .w_full()
                 .when_some(setting.control_width, |input, width| input.max_w(px(width)))
@@ -131,8 +135,29 @@ impl SettingsWindow {
                 .track_focus(&focus)
                 .tab_index(0_isize)
                 .focus(|style| style.border_color(palette.accent))
-                .child(field)
-                .into_any_element()
+                .child(field);
+            if setting.kind == Kind::Color {
+                let color = self
+                    .values()
+                    .get(&setting.id)
+                    .and_then(|value| crate::configuration::RgbColor::parse(value).ok());
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(12.))
+                    .child(input)
+                    .child(
+                        div()
+                            .size(px(28.))
+                            .flex_shrink_0()
+                            .border_1()
+                            .border_color(palette.line)
+                            .when_some(color, |swatch, color| swatch.bg(gpui::rgb(color.rgb()))),
+                    )
+                    .into_any_element()
+            } else {
+                input.into_any_element()
+            }
         };
         row = row.child(div().mt(px(12.)).child(control));
         if let Some(error) = error {
@@ -150,47 +175,25 @@ impl SettingsWindow {
 }
 
 impl SettingsWindow {
-    fn render_header(&self, cx: &Context<Self>) -> AnyElement {
+    fn render_header(&self, cx: &mut Context<Self>) -> AnyElement {
         let palette = panel_style::palette(cx);
-        let layout = self.registry.layout.clone();
-        let dirty = self.dirty();
-        div()
-            .h(px(layout.header))
-            .flex_shrink_0()
+        let left = div()
             .flex()
             .items_center()
-            .justify_between()
-            .pl(px(20.))
-            .pr(px(16.))
-            .border_b_1()
-            .border_color(palette.line)
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(5.))
-                    .child(
-                        div()
-                            .text_size(px(15.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(self.scope.title()),
-                    )
-                    .when(dirty, |row| {
-                        row.child(
-                            div()
-                                .text_size(px(10.))
-                                .text_color(palette.muted)
-                                .child("· 有未应用的修改"),
-                        )
-                    }),
-            )
-            .child(
-                div()
-                    .text_size(px(12.))
-                    .text_color(palette.muted)
-                    .child(self.scope.explanation()),
-            )
-            .into_any_element()
+            .gap(px(8.))
+            .text_size(px(12.))
+            .child(self.scope.title())
+            .when(self.dirty(), |row| {
+                row.child(div().text_color(palette.muted).child("未应用"))
+            });
+        let right = div()
+            .text_size(px(11.))
+            .text_color(palette.muted)
+            .child(self.scope.explanation());
+        self.window_chrome.update(cx, |chrome, _| {
+            chrome.content(left.into_any_element(), right.into_any_element())
+        });
+        self.window_chrome.clone().into_any_element()
     }
     fn render_navigation(&self, cx: &Context<Self>) -> AnyElement {
         let palette = panel_style::palette(cx);

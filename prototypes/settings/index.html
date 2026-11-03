@@ -2,9 +2,9 @@
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>altaed · 设置</title><link rel="stylesheet" href="style.css"></head>
 <body>
-  <div class="prototype"><span>设置原型 · 修改仅保存在此页面</span><a id="other-window" href="?document">文档运行配置原型</a><label><input id="extension-preview" type="checkbox"> 显示插件扩展示例</label></div>
+  <div class="prototype"><span>设置原型 · 修改仅保存在此页面</span><a id="other-window" href="?document">文档运行配置原型</a><label>平台 <select id="platform-preview" aria-label="平台预览"><option value="macos">macOS</option><option value="windows">Windows</option></select></label><label><input id="extension-preview" type="checkbox"> 显示插件扩展示例</label></div>
   <section class="settings" aria-label="altaed 设置">
-    <header><h1>设置</h1><span id="scope-note">对整个软件生效</span></header>
+    <header class="settings-window-chrome"><div class="traffic-lights" role="img" aria-label="macOS 窗口控制，原型示意"><i></i><i></i><i></i></div><h1>设置</h1><span id="scope-note">对整个软件生效</span><div class="windows-controls" role="img" aria-label="Windows 窗口控制，原型示意"><svg viewBox="0 0 24 24"><path d="M7 16h10"/></svg><svg viewBox="0 0 24 24"><path d="M7 7h10v10H7Z"/></svg><svg viewBox="0 0 24 24"><path d="m7 7 10 10m0-10L7 17"/></svg></div></header>
     <div class="body"><aside><div class="search"><input id="search" type="search" aria-label="搜索设置" placeholder="搜索设置…"></div><nav aria-label="设置分类"></nav><p class="extension-note">插件启用后，其选项会出现在这里。</p></aside><main><div class="page-title"><h2 id="page-title"></h2><p id="page-description"></p></div><form id="fields" novalidate></form><div id="empty" hidden><h2>没有匹配的设置</h2><p>试试“编译器”“超时”或“比较”。</p><button id="clear-search">清除搜索</button></div></main></div>
     <footer><button id="reset">恢复本页默认值</button><span id="status" role="status">修改只应用到当前文档</span><div><button id="cancel">取消</button><button id="apply" class="primary" disabled>应用</button></div></footer>
   </section><script type="module" src="app.js"></script>

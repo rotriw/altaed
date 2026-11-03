@@ -1,3 +1,4 @@
+mod executable_checker;
 pub(crate) mod process;
 pub use crate::toolchain::{discover_compiler, verify_compiler};
 use crate::{checker::Checker, document::CodeDocument};
@@ -19,6 +20,7 @@ pub struct ExecutionSettings {
     pub compile_timeout_ms: u64,
     pub test_timeout_ms: u64,
     pub output_limit_bytes: u64,
+    pub test_data_limit_bytes: u64,
     pub checker: Checker,
 }
 impl Default for ExecutionSettings {
@@ -27,14 +29,22 @@ impl Default for ExecutionSettings {
             compile_timeout_ms: 30_000,
             test_timeout_ms: 2_000,
             output_limit_bytes: 1_048_576,
+            test_data_limit_bytes: 64 * 1024 * 1024,
             checker: Checker::default(),
         }
     }
 }
 impl ExecutionSettings {
+    pub fn checker_label(&self) -> String {
+        self.checker.label()
+    }
+
     pub fn validate(&self) -> Result<()> {
         ensure!(
-            self.compile_timeout_ms > 0 && self.test_timeout_ms > 0 && self.output_limit_bytes > 0,
+            self.compile_timeout_ms > 0
+                && self.test_timeout_ms > 0
+                && self.output_limit_bytes > 0
+                && self.test_data_limit_bytes > 0,
             "超时和输出上限必须大于零"
         );
         self.checker.validate()
@@ -56,11 +66,32 @@ pub enum Verdict {
     TimedOut,
     Cancelled,
     OutputLimit,
+    CheckerError,
 }
 pub struct CaseResult {
     pub index: usize,
     pub output: ProcessOutput,
     pub verdict: Verdict,
+    pub checker: Option<CheckerOutput>,
+}
+pub enum CheckerOutput {
+    Completed(ProcessOutput),
+    Failed(String),
+}
+impl CheckerOutput {
+    pub fn description(&self) -> String {
+        match self {
+            Self::Completed(output) => format!(
+                "{:?} · {} · {} ms\n{}{}",
+                output.termination,
+                output.status,
+                output.elapsed.as_millis(),
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ),
+            Self::Failed(message) => message.clone(),
+        }
+    }
 }
 pub struct RunReport {
     pub id: Uuid,
@@ -72,6 +103,7 @@ pub struct RunReport {
     pub compile: ProcessOutput,
     pub cases: Vec<CaseResult>,
     pub mode: RunMode,
+    pub test_snapshot: Vec<crate::sample_files::ResolvedTest>,
 }
 impl RunReport {
     pub fn is_current(&self, document: &CodeDocument) -> bool {
@@ -106,6 +138,10 @@ impl RunReport {
                             case.verdict.label(),
                             case.output.elapsed.as_millis()
                         ));
+                        if let Some(checker) = &case.checker {
+                            text.extend(checker.description().chars().take(300));
+                            text.push('\n');
+                        }
                         if text.len() > 1000 {
                             text.push_str("其余结果见各用例。\n");
                             break;
@@ -143,6 +179,9 @@ impl RunReport {
                 String::from_utf8_lossy(&case.output.stdout),
                 String::from_utf8_lossy(&case.output.stderr)
             ));
+            if let Some(checker) = &case.checker {
+                text.push_str(&format!("比较器：\n{}\n", checker.description()));
+            }
         }
         const DISPLAY_LIMIT: usize = 65_536;
         if text.len() > DISPLAY_LIMIT {
@@ -159,15 +198,22 @@ impl RunReport {
 impl Verdict {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Passed => "通过",
-            Self::WrongAnswer => "答案不符",
+            Self::Passed => "Accepted",
+            Self::WrongAnswer => "WrongAnswer",
             Self::Observed => "运行结束（未设置预期输出）",
             Self::RuntimeError => "运行错误",
             Self::TimedOut => "超时",
             Self::Cancelled => "已取消",
             Self::OutputLimit => "输出超限",
+            Self::CheckerError => "比较器错误",
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExecutionPhase {
+    Compiling,
+    Running,
 }
 
 pub fn execute(
@@ -177,14 +223,45 @@ pub fn execute(
     cancel: Arc<AtomicBool>,
     default_compiler: Option<PathBuf>,
 ) -> Result<RunReport> {
+    execute_with_progress(snapshot, mode, root, cancel, default_compiler, |_| {})
+}
+pub fn execute_with_progress(
+    snapshot: CodeDocument,
+    mode: RunMode,
+    root: &Path,
+    cancel: Arc<AtomicBool>,
+    default_compiler: Option<PathBuf>,
+    mut on_phase: impl FnMut(ExecutionPhase),
+) -> Result<RunReport> {
     let settings = &snapshot.metadata.settings;
     settings.execution.validate()?;
     if matches!(mode, RunMode::Tests | RunMode::Test(_)) {
+        ensure!(
+            snapshot
+                .metadata
+                .problem
+                .as_ref()
+                .is_none_or(|problem| problem.supports_sample_runner()),
+            "此题使用交互或文件输入输出，暂不支持自动样例评测；仍可编译并在终端运行"
+        );
         ensure!(
             !snapshot.metadata.tests.is_empty(),
             "当前文档没有测试，请先添加测试"
         );
     }
+    let test_snapshot = if matches!(mode, RunMode::Tests | RunMode::Test(_)) {
+        crate::sample_files::resolve_tests(
+            &snapshot,
+            if let RunMode::Test(index) = mode {
+                Some(index)
+            } else {
+                None
+            },
+            settings.execution.test_data_limit_bytes,
+        )?
+    } else {
+        Vec::new()
+    };
     let requested_compiler = settings
         .compiler_path
         .clone()
@@ -212,17 +289,38 @@ pub fn execute(
     let directory = fs::canonicalize(directory)?;
     let source = directory.join("main.cpp");
     fs::write(&source, &snapshot.text)?;
+    for test in &test_snapshot {
+        if let Some(expected) = &test.expected_output {
+            let case_directory = directory.join(format!("case-{}", test.index));
+            fs::create_dir_all(&case_directory)?;
+            fs::write(case_directory.join("expected"), expected.as_bytes())
+                .with_context(|| format!("无法保存用例 {} 的预期输出快照", test.index + 1))?;
+        }
+    }
     let executable = directory.join(format!("program{}", std::env::consts::EXE_SUFFIX));
+    let checker = if test_snapshot
+        .iter()
+        .any(|test| test.expected_output.is_some())
+    {
+        if let Checker::Executable(checker) = &settings.execution.checker {
+            Some(executable_checker::prepare(&snapshot, checker, &directory)?)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
     let mut command = Command::new(&compiler);
     command
         .current_dir(&working)
-        .args(&settings.compiler_arguments)
+        .args(settings.effective_compiler_arguments())
         .arg(&source)
         .arg("-o")
         .arg(&executable);
     if let Some(parent) = snapshot.path.as_ref().and_then(|p| p.parent()) {
         command.arg("-iquote").arg(parent);
     }
+    on_phase(ExecutionPhase::Compiling);
     let compile = process::execute(
         command,
         b"",
@@ -236,10 +334,9 @@ pub fn execute(
         && compile.status.success()
         && matches!(mode, RunMode::Tests | RunMode::Test(_))
     {
-        for (index, test) in snapshot.metadata.tests.iter().enumerate() {
-            if matches!(mode, RunMode::Test(selected) if selected != index) {
-                continue;
-            }
+        on_phase(ExecutionPhase::Running);
+        for test in &test_snapshot {
+            let index = test.index;
             let mut command = crate::toolchain::runtime_command(&executable, &compiler)?;
             command.current_dir(&working);
             let output = process::execute(
@@ -250,6 +347,7 @@ pub fn execute(
                 settings.execution.output_limit_bytes,
                 &cancel,
             )?;
+            let mut checker_output = None;
             let verdict = match output.termination {
                 Termination::TimedOut => Verdict::TimedOut,
                 Termination::Cancelled => Verdict::Cancelled,
@@ -257,6 +355,17 @@ pub fn execute(
                 Termination::Exited if !output.status.success() => Verdict::RuntimeError,
                 _ => match &test.expected_output {
                     None => Verdict::Observed,
+                    Some(_) if checker.is_some() => {
+                        let (verdict, result) = executable_checker::evaluate(
+                            checker.as_ref().context("比较器快照未准备")?,
+                            &directory.join(format!("case-{index}")),
+                            &compiler,
+                            settings.execution.output_limit_bytes,
+                            &cancel,
+                        );
+                        checker_output = Some(result);
+                        verdict
+                    }
                     Some(expected)
                         if settings.execution.checker.accepts(expected, &output.stdout) =>
                     {
@@ -265,11 +374,12 @@ pub fn execute(
                     _ => Verdict::WrongAnswer,
                 },
             };
-            let cancelled = output.termination == Termination::Cancelled;
+            let cancelled = matches!(verdict, Verdict::Cancelled);
             cases.push(CaseResult {
                 index,
                 output,
                 verdict,
+                checker: checker_output,
             });
             if cancelled {
                 break;
@@ -286,6 +396,7 @@ pub fn execute(
         compile,
         cases,
         mode,
+        test_snapshot,
     })
 }
 
@@ -365,6 +476,12 @@ mod tests {
         let mut doc = CodeDocument::untitled();
         doc.path = Some(original.clone());
         doc.metadata.settings.compiler_path = Some(compiler.clone());
+        doc.metadata.settings.compiler_options = crate::toolchain::CompilerOptions {
+            optimization: crate::toolchain::Optimization::Debug,
+            warnings: true,
+            debug_info: true,
+            ..Default::default()
+        };
         doc.metadata.settings.execution.test_timeout_ms = 150;
         doc.metadata.settings.execution.output_limit_bytes = 65_536;
         doc.text = "#include <iostream>\n#include \"value.h\"\nint main(){int n;std::cin>>n;if(n==1)while(true){};if(n==2){while(true)std::cout<<\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\";} if(n==3)return 7;std::cout<<answer;}".into();
@@ -372,52 +489,62 @@ mod tests {
             TestCase {
                 input: "0".into(),
                 expected_output: Some("42\n".into()),
+                ..Default::default()
             },
             TestCase {
                 input: "0".into(),
                 expected_output: Some("43".into()),
+                ..Default::default()
             },
             TestCase {
                 input: "0".into(),
                 expected_output: None,
+                ..Default::default()
             },
             TestCase {
                 input: "1".into(),
                 expected_output: None,
+                ..Default::default()
             },
             TestCase {
                 input: "2".into(),
                 expected_output: None,
+                ..Default::default()
             },
             TestCase {
                 input: "3".into(),
                 expected_output: None,
+                ..Default::default()
             },
             TestCase {
                 input: "0".into(),
                 expected_output: Some("".into()),
+                ..Default::default()
             },
         ];
         let cancel = Arc::new(AtomicBool::new(false));
-        let report = execute(
+        let mut phases = Vec::new();
+        let report = execute_with_progress(
             doc.clone(),
             RunMode::Tests,
             &root.0.join("runs"),
             cancel.clone(),
             None,
+            |phase| phases.push(phase),
         )?;
+        assert_eq!(phases, [ExecutionPhase::Compiling, ExecutionPhase::Running]);
         assert!(report.compiled(), "{}", report.summary());
         let labels: Vec<_> = report.cases.iter().map(|c| c.verdict.label()).collect();
         assert_eq!(
             labels,
             [
-                "通过",
-                "答案不符",
+                "Accepted",
+                "WrongAnswer",
                 "运行结束（未设置预期输出）",
                 "超时",
                 "输出超限",
                 "运行错误",
-                "答案不符"
+                "运行结束（未设置预期输出）"
             ]
         );
         let selected = execute(

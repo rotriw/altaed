@@ -17,14 +17,6 @@ impl Render for PanelDrag {
     }
 }
 
-fn control(id: &'static str, label: &'static str) -> Button {
-    Button::new(id, label)
-        .label_size(LabelSize::Small)
-        .style(ButtonStyle::Transparent)
-        .size(ButtonSize::Compact)
-        .tab_index(0_isize)
-}
-
 impl Ide {
     fn messages_height(&self, id: DocumentId) -> f32 {
         self.layout.messages_height(
@@ -37,7 +29,12 @@ impl Ide {
         self.session.documents[index].display_name()
     }
 
-    fn toggle_panel(&mut self, panel: Panel, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn toggle_panel(
+        &mut self,
+        panel: Panel,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.layout.toggle(panel);
         window.focus(&self.views[self.session.active].editor.focus_handle(cx), cx);
         cx.notify();
@@ -101,9 +98,10 @@ impl Ide {
                         delta
                     };
                     let viewport = window.viewport_size();
-                    let (left, right, bottom) = this
-                        .layout
-                        .sizes(viewport.width.into(), viewport.height.into());
+                    let (left, right, bottom) = this.layout.sizes(
+                        viewport.width.into(),
+                        (viewport.height - super::window_chrome::height(window)).into(),
+                    );
                     let size = match panel {
                         Panel::Documents => left,
                         Panel::Context => right,
@@ -208,16 +206,38 @@ impl Ide {
                 ))
                 .child(
                     div()
+                        .id("problem-details")
+                        .flex_1()
+                        .min_h_0()
+                        .overflow_y_scroll()
                         .p(px(12.))
                         .child(
-                            document
-                                .metadata
-                                .problem_title
-                                .clone()
+                            document.metadata.problem.as_ref().map(|problem| problem.title.clone())
+                                .or_else(|| document.metadata.problem_title.clone())
                                 .unwrap_or_else(|| "未绑定题目".into()),
                         )
-                        .when_some(document.metadata.problem_url.clone(), |d, url| {
+                        .when_some(document.metadata.problem.as_ref().map(|problem| problem.url.clone())
+                            .or_else(|| document.metadata.problem_url.clone()), |d, url| {
                             d.child(div().mt(px(8.)).text_color(c.muted).child(url))
+                        })
+                        .when_some(document.metadata.problem.as_ref(), |d, problem| {
+                            let input = match &problem.input {
+                                altaed_core::problem::ProblemInput::Stdin => "标准输入".to_owned(),
+                                altaed_core::problem::ProblemInput::File { file_name } => format!("输入文件：{file_name}"),
+                                altaed_core::problem::ProblemInput::Regex { pattern } => format!("输入文件匹配：{pattern}"),
+                            };
+                            let output = match &problem.output {
+                                altaed_core::problem::ProblemOutput::Stdout => "标准输出".to_owned(),
+                                altaed_core::problem::ProblemOutput::File { file_name } => format!("输出文件：{file_name}"),
+                            };
+                            d.when(!problem.group.is_empty(), |d| d.child(div().mt(px(12.)).child(problem.group.clone())))
+                                .when_some(problem.time_limit_ms, |d, limit| d.child(div().mt(px(8.)).child(format!("题目时间限制：{limit} ms"))))
+                                .when_some(problem.memory_limit_mb, |d, limit| d.child(div().mt(px(8.)).child(format!("题目内存限制：{limit} MB"))))
+                                .child(div().mt(px(8.)).child(input))
+                                .child(div().mt(px(8.)).child(output))
+                                .child(div().mt(px(8.)).child(format!("原始样例：{} 组", problem.samples.len())))
+                                .when(!problem.supports_sample_runner(), |d| d.child(div().mt(px(12.)).text_color(c.muted)
+                                    .child("交互或文件输入输出暂不支持自动样例评测；信息已保留，可编译后在终端运行。")))
                         }),
                 )
                 .into_any_element();
@@ -292,16 +312,19 @@ impl Ide {
                                     .child(document.metadata.tests.len().to_string()),
                             ),
                     )
-                    .when(!document.metadata.tests.is_empty(), |heading| {
-                        heading.child(
-                            crate::panel_style::button("add-inline-test", "添加用例", cx).on_click(
-                                cx.listener(|this, _, window, cx| {
-                                    this.add_test(&AddTest, window, cx)
-                                }),
-                            ),
-                        )
-                    }),
+                    .child(
+                        crate::panel_style::button("add-inline-test", "添加用例", cx)
+                            .icon(IconName::Plus)
+                            .icon_position(IconPosition::Start)
+                            .icon_size(IconSize::Custom(gpui::rems(
+                                px(14.) / ThemeSettings::get_global(cx).ui_font_size(cx),
+                            )))
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.add_test(&AddTest, window, cx)
+                            })),
+                    ),
             )
+            .child(self.render_checker_controls(document, cx))
             .when(document.metadata.tests.is_empty(), |d| {
                 d.child(
                     div()
@@ -340,25 +363,6 @@ impl Ide {
                 )
                 .flex_1()
                 .min_h_0(),
-            )
-            .child(
-                div()
-                    .h(px(27.))
-                    .flex_shrink_0()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .px(px(12.))
-                    .border_t_1()
-                    .border_color(c.line)
-                    .text_size(px(10.))
-                    .text_color(c.muted)
-                    .child(match document.metadata.settings.execution.checker {
-                        crate::checker::Checker::Exact => "严格文本",
-                        crate::checker::Checker::Tokens => "忽略空白",
-                        _ => "浮点比较",
-                    })
-                    .child("输入与预期输出可编辑 · 实际输出只读"),
             )
             .into_any_element()
     }
@@ -430,6 +434,8 @@ impl Ide {
 
 impl Render for Ide {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.sync_companion(window, cx);
+        self.sync_checker_controls(window, cx);
         if self.preferences_pending {
             self.preferences_pending = false;
             for view in &self.views {
@@ -439,9 +445,10 @@ impl Render for Ide {
         let snapshot = &self.session;
         let colors = cx.theme().colors();
         let viewport = window.viewport_size();
-        let (left, right, bottom) = self
-            .layout
-            .sizes(viewport.width.into(), viewport.height.into());
+        let (left, right, bottom) = self.layout.sizes(
+            viewport.width.into(),
+            (viewport.height - super::window_chrome::height(window)).into(),
+        );
         let current = &snapshot.documents[self.session.active];
         let visibility = (
             current.id,
@@ -532,13 +539,13 @@ impl Render for Ide {
                     Panel::Documents => pointer.x - px(sidebar::ACTIVITY_BAR_WIDTH),
                     Panel::Context => viewport.width - pointer.x,
                     Panel::Output => viewport.height - px(STATUS_HEIGHT) - pointer.y,
-                    Panel::Messages => pointer.y,
+                    Panel::Messages => pointer.y - super::window_chrome::height(window),
                 };
                 this.layout.set_size(drag.0, extent.into());
                 cx.notify();
             }))
             .on_drag_move(
-                cx.listener(|this, event: &DragMoveEvent<PanelDrag>, _, cx| {
+                cx.listener(|this, event: &DragMoveEvent<PanelDrag>, window, cx| {
                     let panel = event.drag(cx).0;
                     let extent = match panel {
                         Panel::Documents => {
@@ -550,12 +557,17 @@ impl Render for Ide {
                         Panel::Output => {
                             event.bounds.bottom() - px(STATUS_HEIGHT) - event.event.position.y
                         }
-                        Panel::Messages => event.event.position.y - event.bounds.top(),
+                        Panel::Messages => {
+                            event.event.position.y
+                                - event.bounds.top()
+                                - super::window_chrome::height(window)
+                        }
                     };
                     this.layout.set_size(panel, extent.into());
                     cx.notify();
                 }),
             )
+            .child(self.render_title_bar(cx))
             .child(
                 div()
                     .flex()
@@ -592,76 +604,7 @@ impl Render for Ide {
                             }),
                     ),
             )
-            .child(
-                div()
-                    .h(px(STATUS_HEIGHT))
-                    .flex_shrink_0()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .px_2()
-                    .bg(colors.surface_background)
-                    .border_t_1()
-                    .border_color(colors.border)
-                    .text_xs()
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap_3()
-                            .min_w_0()
-                            .child(
-                                control("output-toggle", "输出")
-                                    .toggle_state(self.layout.output_visible)
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.toggle_panel(Panel::Output, window, cx)
-                                    })),
-                            )
-                            .child(
-                                div()
-                                    .overflow_hidden()
-                                    .child(self.status.text_for(current.id).to_owned()),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .gap_3()
-                            .flex_shrink_0()
-                            .text_color(colors.text_muted)
-                            .child(if current.is_dirty() {
-                                "有未保存修改"
-                            } else if current.path.is_some() {
-                                "已保存"
-                            } else {
-                                "未命名"
-                            })
-                            .when_some(self.language_service.as_ref(), |row, service| {
-                                let (label, detail) = service.read(cx).status(current.id);
-                                row.child(
-                                    crate::panel_style::button(
-                                        "language-server-status",
-                                        label.to_owned(),
-                                        cx,
-                                    )
-                                    .tooltip(Tooltip::text(
-                                        detail.unwrap_or("C++ 语言服务；点击重新启动").to_owned(),
-                                    ))
-                                    .on_click(cx.listener(
-                                        |this, _, window, cx| {
-                                            this.restart_language_server(
-                                                &RestartLanguageServer,
-                                                window,
-                                                cx,
-                                            )
-                                        },
-                                    )),
-                                )
-                            })
-                            .child("C++")
-                            .child("UTF-8"),
-                    ),
-            )
+            .child(self.render_status_bar(current, cx))
     }
 }
 

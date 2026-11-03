@@ -13,6 +13,8 @@ const LOCK_FILE_NAME: &str = "config.lock";
 struct ConfigFile {
     version: u32,
     #[serde(default)]
+    companion: crate::companion::CompanionSettings,
+    #[serde(default)]
     editor: crate::configuration::EditorPreferences,
     #[serde(default = "legacy_toolchain")]
     toolchain: crate::configuration::ToolchainPreferences,
@@ -36,6 +38,7 @@ fn legacy_toolchain() -> crate::configuration::ToolchainPreferences {
 impl From<ConfigFile> for AppPreferences {
     fn from(file: ConfigFile) -> Self {
         Self {
+            companion: file.companion,
             editor: file.editor,
             toolchain: file.toolchain,
             language_server: file.language_server,
@@ -145,6 +148,7 @@ pub fn save(
 fn encode(preferences: &AppPreferences) -> Result<Vec<u8>> {
     Ok(serde_json::to_vec_pretty(&ConfigFile {
         version: VERSION,
+        companion: preferences.companion.clone(),
         editor: preferences.editor.clone(),
         toolchain: preferences.toolchain.clone(),
         language_server: preferences.language_server.clone(),
@@ -172,6 +176,8 @@ mod tests {
         assert!(!load_or_create(&directory)?.created);
         assert_eq!(fs::read(&path)?, bytes);
         let mut changed = first.preferences.clone();
+        changed.editor.theme = crate::color_theme::ColorThemeId::parse("horizon-bright")?;
+        changed.workbench.compiling_color = Some(crate::configuration::RgbColor::parse("#f0e2dc")?);
         changed.keybindings.insert(
             commands::CommandId("run.compile".into()),
             "ctrl-alt-b".into(),
@@ -234,6 +240,7 @@ mod tests {
         let mut json: serde_json::Value =
             serde_json::from_slice(&fs::read(directory.join(FILE_NAME))?)?;
         json.as_object_mut().unwrap().remove("toolchain");
+        json["editor"].as_object_mut().unwrap().remove("theme");
         json["keybindings"]
             .as_object_mut()
             .unwrap()
@@ -242,6 +249,7 @@ mod tests {
         fs::write(directory.join(FILE_NAME), serde_json::to_vec(&json)?)?;
         let migrated = load(&directory)?;
         assert!(migrated.toolchain.setup_complete);
+        assert_eq!(migrated.editor.theme, Default::default());
         assert_eq!(
             migrated.keybindings[&commands::CommandId("run.compile_and_run".into())],
             "ctrl-alt-r"

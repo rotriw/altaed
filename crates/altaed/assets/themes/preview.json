@@ -1,0 +1,65 @@
+[
+  [
+    {
+      "text": "#include ",
+      "capture": "preproc"
+    },
+    {
+      "text": "<iostream>",
+      "capture": "string"
+    }
+  ],
+  [
+    {
+      "text": "int ",
+      "capture": "type.builtin"
+    },
+    {
+      "text": "square",
+      "capture": "function"
+    },
+    {
+      "text": "("
+    },
+    {
+      "text": "int ",
+      "capture": "type.builtin"
+    },
+    {
+      "text": "value",
+      "capture": "variable"
+    },
+    {
+      "text": ") {"
+    }
+  ],
+  [
+    {
+      "text": "    "
+    },
+    {
+      "text": "return ",
+      "capture": "keyword"
+    },
+    {
+      "text": "value",
+      "capture": "variable"
+    },
+    {
+      "text": " * ",
+      "capture": "operator"
+    },
+    {
+      "text": "value",
+      "capture": "variable"
+    },
+    {
+      "text": ";"
+    }
+  ],
+  [
+    {
+      "text": "}"
+    }
+  ]
+]

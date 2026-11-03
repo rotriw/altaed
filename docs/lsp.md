@@ -46,7 +46,7 @@ GPUI 的确定性测试调度器拒绝真实子进程 I/O 的外部线程唤醒�
 
 ## 当前边界
 
-只针对 C++/clangd：补全及 snippet、推送诊断、定义跳转和函数参数提示。默认关闭头文件自动插入；需要附加编辑或执行命令的补全项不展示。本轮未实现 hover、重命名、格式化、code action 和引用列表。多定义目前选择首个结果。
+只针对 C++/clangd：补全及 snippet、推送诊断、定义跳转、函数参数提示和参数/类型行内提示。默认关闭头文件自动插入；需要附加编辑或执行命令的补全项不展示。本轮未实现 hover、重命名、格式化、code action 和引用列表。多定义目前选择首个结果。
 
 每份代码独立分析，尚未将已打开但未保存的头文件作为其他翻译单元的 overlay，也未自动加载原工程 `compile_commands.json`／源码目录的 `.clangd`。这不是完整多文件工程支持；需要包含路径或宏时在文档运行配置中明确提供。虚拟 URI 也会使语言服务中的 `__FILE__` 与真实编译文件路径不同。Windows 内嵌工具链和对应 clangd 包装未验证。
 
@@ -62,3 +62,17 @@ GPUI 的确定性测试调度器拒绝真实子进程 I/O 的外部线程唤醒�
 真实协议证据：`evidence/lsp/code-hints-protocol.json`；重复执行 `python3 scripts/verify_clangd.py --output evidence/lsp/code-hints-protocol.json`。它使用真实 clangd、中文与空格临时路径、同一行 emoji 和未落盘源文件，验证函数说明、第二参数定位及 vector 成员 snippet。确定性测试另覆盖参数 provider 的 UTF-16 请求、高亮与旧版本回复拒绝。主应用 37 项测试记录在 `evidence/code-intelligence-tests.log`。
 
 原生资源栏已截图；自动输入检查过程中用户开始使用预览窗口，因此停止操作，未声称本轮原生参数浮层已经人工通过。可在 `target/Altaed Intelligence.app` 新建代码后输入两参数函数并调用，用逗号、Tab、Escape 和手动参数提示快捷键验收。用户正在编辑的会话不会被重置。
+
+## 2026-11-03 输入补全与可选行内提示
+
+输入时代码补全默认开启，软件设置中的“编辑器”分类可控制自动弹出，手动补全快捷键独立保留。标识符、成员访问和作用域触发使用真实 clangd 候选；函数 snippet 沿用 Editor 的确认与参数占位导航。
+
+修复自动输入与 `BufferEvent::Edited` 的时序竞态：请求前先观察实际文本版本并发送变更，后续编辑通知对同一快照不再重复增加协议版本，避免丢掉当前候选。回归通过真实 Editor 按键触发请求并用 Tab 确认函数 snippet；也验证单次请求失败后继续输入可以恢复，不关闭整个语言服务。这项使用确定性协议夹具，区别于下面的真实 clangd 探针。
+
+行内提示总开关默认关闭，开启后可分别控制参数名和推导类型。使用标准 `textDocument/inlayHint`，只在服务声明支持时请求，并通过 Editor 原生 inlay 显示。提示不进入源码、剪贴板或编译快照；不执行提示携带的命令、文本编辑或链接。clangd 对这两种提示的语义说明见[官方配置](https://clangd.llvm.org/config#inlayhints)。
+
+请求合并等待250毫秒；代码修改立即清除旧提示，回复按文档身份、实际文本版本、配置代次和服务 epoch 校验。单次最多展示2000项，限制单项长度并拒绝越界 UTF-16 位置和多行标签。不支持或提示请求失败时显示原因，补全、诊断与编译继续可用。本轮查询整个翻译单元，尚未实现按可见区域分页。
+
+真实协议探针：`python3 scripts/verify_clangd.py --output evidence/lsp/cpp-features-protocol.json`，验证函数说明、第二参数、vector snippet，以及同一行 emoji 后的 `auto` 类型与参数名提示。原生窗口已观察到参数名提示，设置页的编译选项也已检查排版；发现用户正在编辑后停止自动输入，不覆盖其内容。完整体验继续由用户验收。
+
+最终本地48项测试与 release 编译通过，记录在 `evidence/cpp-features-tests.log` 和 `evidence/cpp-features-release.log`。本地应用包已更新；正在运行的旧进程需正常保存并重启后才加载修复。没有强制关闭用户的预览窗口，没有 push、Windows 构建或编译后的 cargo check/Clippy。

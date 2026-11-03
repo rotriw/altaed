@@ -1,0 +1,18 @@
+{
+  "repository": "https://github.com/dracula/visual-studio-code",
+  "revision": "b50e62e320906d5f57a8bf05fd6ddf23b890d6dd",
+  "files": [
+    "package.json",
+    "LICENSE"
+  ],
+  "distribution": {
+    "version": "2.25.1",
+    "url": "https://dracula-theme.gallery.vsassets.io/_apis/public/gallery/publisher/dracula-theme/extension/theme-dracula/2.25.1/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage",
+    "sha256": "8a319b762a9b0d0999615a990b1d97e16eca44d57750375d5afcfef71fef7dc0"
+  },
+  "sha256": {
+    "LICENSE": "f08d0bba7f8906ed4e7a76d7e555a883968d83eb550ae298ce893a65aee15dff",
+    "dracula.json": "ae473d11bdef6ad5d3fc3c6cf3a104e98c9fd8a195f13c5cc1699df33a2537eb",
+    "package.json": "f6b7f4f3b148cc4f898a48b3f2a2eb4eac88bdc1e7234da7d2c21bfbb17d4abe"
+  }
+}

@@ -22,6 +22,7 @@ impl EditorView {
             });
             editor.set_show_line_numbers(preferences.line_numbers, cx);
             editor.set_auto_signature_help(preferences.auto_signature_help, cx);
+            editor.set_show_completions_on_input(Some(preferences.auto_completions));
             editor.set_soft_wrap_mode(
                 if preferences.soft_wrap {
                     language::language_settings::SoftWrap::EditorWidth
@@ -48,6 +49,15 @@ impl EditorView {
 }
 
 impl EditorView {
+    pub fn cursor_position(&self, cx: &App) -> language::PointUtf16 {
+        use editor::ToPoint;
+        let editor = self.editor.read(cx);
+        editor
+            .selections
+            .newest_anchor()
+            .head()
+            .to_point_utf16(&editor.buffer().read(cx).snapshot(cx))
+    }
     pub fn cursor_offset(&self, cx: &App) -> usize {
         use editor::ToOffset;
         let editor = self.editor.read(cx);

@@ -1,4 +1,9 @@
 use super::*;
+use crate::runner::ExecutionPhase;
+use futures::StreamExt;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct RunRequestId(uuid::Uuid);
 use crate::{
     document::TestCase,
     runner::{self, RunMode, RunReport},
@@ -9,6 +14,9 @@ use std::{
 };
 
 pub(super) struct RunState {
+    request: RunRequestId,
+    pub phase: ExecutionPhase,
+    _progress: Option<gpui::Task<()>>,
     pub stale: bool,
     pub brief: String,
     pub cancel: Arc<AtomicBool>,
@@ -28,14 +36,28 @@ impl Ide {
     pub(super) fn start_run(&mut self, mode: RunMode, _: &mut Window, cx: &mut Context<Self>) {
         let snapshot = self.session.documents[self.session.active].clone();
         let id = snapshot.id;
+        if matches!(mode, RunMode::Tests | RunMode::Test(_))
+            && let Some(error) = self.checker_parameter_error(id).map(str::to_owned)
+        {
+            self.checker_controls.entry(id).or_default().expanded = true;
+            self.layout.context_visible = true;
+            self.status = StatusMessage::Document(id, format!("比较器参数未应用：{error}"));
+            cx.notify();
+            return;
+        }
         if self.runs.get(&id).is_some_and(|run| run.running) {
             return;
         }
+        let request = RunRequestId(uuid::Uuid::new_v4());
+        let (progress, mut phases) = futures::channel::mpsc::unbounded();
         let cancel = Arc::new(AtomicBool::new(false));
         let artifact = self.runs.get(&id).and_then(|run| run.artifact.clone());
         self.runs.insert(
             id,
             RunState {
+                request,
+                phase: ExecutionPhase::Compiling,
+                _progress: None,
                 stale: false,
                 brief: "正在执行…".into(),
                 cancel: cancel.clone(),
@@ -50,6 +72,29 @@ impl Ide {
                 .into(),
             },
         );
+        let observer = cx.spawn(async move |this, cx| {
+            while let Some(phase) = phases.next().await {
+                if this
+                    .update(cx, |this, cx| {
+                        // Queued phase events from an older execution must not
+                        // recolor a subsequent run on the same document.
+                        if let Some(run) = this.runs.get_mut(&id)
+                            && run.request == request
+                            && run.running
+                        {
+                            run.phase = phase;
+                            cx.notify();
+                        }
+                    })
+                    .is_err()
+                {
+                    break;
+                }
+            }
+        });
+        if let Some(run) = self.runs.get_mut(&id) {
+            run._progress = Some(observer);
+        }
         self.layout.context_visible = true;
         self.layout.messages_visible = true;
         let root = self.directory.join("runs");
@@ -57,8 +102,18 @@ impl Ide {
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_spawn(async move {
-                    let report = runner::execute(snapshot, mode, &root, cancel, compiler)?;
+                    let report = runner::execute_with_progress(
+                        snapshot,
+                        mode,
+                        &root,
+                        cancel,
+                        compiler,
+                        |phase| {
+                            let _ = progress.unbounded_send(phase);
+                        },
+                    )?;
                     let terminal = if mode == RunMode::CompileAndRun {
+                        let _ = progress.unbounded_send(ExecutionPhase::Running);
                         report
                             .artifact()
                             .map(|artifact| runner::run_compiled(&artifact, &root))
@@ -133,6 +188,8 @@ impl Ide {
         let current = artifact.is_current(document)
             && selected_compiler.is_none_or(|compiler| compiler == &artifact.compiler);
         run.running = true;
+        run.request = RunRequestId(uuid::Uuid::new_v4());
+        run.phase = ExecutionPhase::Running;
         run.brief = "正在启动已有程序…".into();
         let root = self.directory.join("runs");
         cx.spawn(async move |this, cx| {
@@ -189,6 +246,7 @@ impl Ide {
         doc.metadata.tests.push(TestCase {
             input: String::new(),
             expected_output: Some(String::new()),
+            ..Default::default()
         });
         let id = doc.id;
         self.test_editors.remove(&id);

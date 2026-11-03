@@ -73,7 +73,10 @@ impl LanguageService {
                             Ok(())
                         });
                         match opened {
-                            Ok(()) => this.phase = Phase::Ready,
+                            Ok(()) => {
+                                this.phase = Phase::Ready;
+                                this.refresh_all_inlay_hints(cx);
+                            }
                             Err(error) => this.fail(format!("{error:#}"), cx),
                         }
                     }
@@ -93,6 +96,7 @@ impl LanguageService {
         self.epoch += 1;
         self.startup_task = None;
         for id in self.documents.keys().copied().collect::<Vec<_>>() {
+            self.clear_inlay_hints(id, cx);
             self.clear_diagnostics(id, cx);
             if let (Some(runtime), Some(document)) = (&self.runtime, self.documents.get(&id)) {
                 document.buffer.update(cx, |buffer, cx| {
@@ -111,6 +115,7 @@ impl LanguageService {
         for document in self.documents.values_mut() {
             document.sent_version = -1;
             document.pending_change = None;
+            document.completion_error = None;
         }
     }
     pub fn shutdown(&mut self, cx: &mut Context<Self>) {
@@ -176,6 +181,10 @@ fn initialize_params(server: &LanguageServer, app: &App) -> lsp::InitializeParam
         general: params.capabilities.general,
         text_document: Some(lsp::TextDocumentClientCapabilities {
             synchronization: Some(lsp::TextDocumentSyncClientCapabilities::default()),
+            inlay_hint: Some(lsp::InlayHintClientCapabilities {
+                dynamic_registration: Some(false),
+                resolve_support: None,
+            }),
             completion: Some(lsp::CompletionClientCapabilities {
                 context_support: Some(true),
                 completion_item: Some(lsp::CompletionItemCapability {

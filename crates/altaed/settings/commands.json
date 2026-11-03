@@ -76,16 +76,16 @@
     "label": "编译代码",
     "action": "altaed::CompileDocument",
     "context": null,
-    "macos": "cmd-shift-b",
-    "other": "ctrl-shift-b"
+    "macos": "f9",
+    "other": "f9"
   },
   {
     "id": "run.run",
     "label": "运行已有程序",
     "action": "altaed::RunCompiled",
     "context": null,
-    "macos": "f5",
-    "other": "f5"
+    "macos": "f10",
+    "other": "f10"
   },
   {
     "id": "run.tests",
@@ -100,8 +100,8 @@
     "label": "编译并运行",
     "action": "altaed::CompileAndRun",
     "context": null,
-    "macos": "cmd-shift-r",
-    "other": "ctrl-shift-r"
+    "macos": "f11",
+    "other": "f11"
   },
   {
     "id": "run.cancel",

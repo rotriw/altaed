@@ -1,0 +1,15 @@
+{
+  "name": "A. 求和",
+  "group": "Protocol regression fixtures",
+  "url": "https://codeforces.com/problemset/problem/1/A",
+  "interactive": false,
+  "memoryLimit": 256,
+  "timeLimit": 1000,
+  "tests": [{"input": "1 2\n", "output": "3\n"}, {"input": "", "output": ""}],
+  "testType": "single",
+  "input": {"type": "stdin"},
+  "output": {"type": "stdout"},
+  "languages": {"java": {"mainClass": "Main"}},
+  "batch": {"id": "fixture-batch", "size": 2},
+  "futureField": {"preserved": true}
+}

@@ -1,3 +1,4 @@
+mod theme_picker;
 mod view;
 use super::*;
 use crate::{
@@ -51,7 +52,7 @@ impl Ide {
     pub(super) fn show_settings(&mut self, scope: Scope, cx: &mut Context<Self>) {
         self.show_settings_category(scope, None, cx);
     }
-    fn show_settings_category(
+    pub(super) fn show_settings_category(
         &mut self,
         scope: Scope,
         category: Option<String>,
@@ -87,6 +88,7 @@ impl Ide {
         );
         if let Err(error) = cx.open_window(
             WindowOptions {
+                titlebar: Some(super::window_chrome::options()),
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 window_min_size: Some(size(px(700.), px(460.))),
                 ..Default::default()
@@ -125,6 +127,7 @@ struct Input {
     _changed: Subscription,
 }
 struct SettingsWindow {
+    window_chrome: gpui::Entity<super::window_chrome::WindowChrome>,
     registry: Arc<Registry>,
     original: Original,
     parent: WeakEntity<Ide>,
@@ -176,6 +179,7 @@ impl SettingsWindow {
         let focus = cx.focus_handle();
         window.focus(&focus, cx);
         Self {
+            window_chrome: cx.new(|_| super::window_chrome::WindowChrome::new()),
             registry,
             original,
             parent,

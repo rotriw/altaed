@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -15,10 +15,18 @@ impl std::fmt::Display for DocumentId {
 pub struct TestCase {
     pub input: String,
     pub expected_output: Option<String>,
+    #[serde(default)]
+    pub input_file: Option<PathBuf>,
+    #[serde(default)]
+    pub expected_file: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DocumentSettings {
+    #[serde(default)]
+    pub cpp_standard: crate::toolchain::CppStandard,
+    #[serde(default)]
+    pub compiler_options: crate::toolchain::CompilerOptions,
     pub compiler_path: Option<PathBuf>,
     pub compiler_arguments: Vec<String>,
     pub working_directory: Option<PathBuf>,
@@ -31,8 +39,10 @@ pub struct DocumentSettings {
 impl Default for DocumentSettings {
     fn default() -> Self {
         Self {
+            cpp_standard: Default::default(),
+            compiler_options: Default::default(),
             compiler_path: None,
-            compiler_arguments: vec!["-std=c++20".into(), "-O2".into()],
+            compiler_arguments: vec!["-O2".into()],
             working_directory: None,
             execution: Default::default(),
             extensions: Default::default(),
@@ -40,8 +50,26 @@ impl Default for DocumentSettings {
     }
 }
 
+impl DocumentSettings {
+    /// Preserve legacy/manual flags in default mode. An explicit selection
+    /// overrides only -std, leaving all other per-document options intact.
+    pub fn effective_compiler_arguments(&self) -> Vec<String> {
+        let arguments = self.compiler_options.arguments(&self.compiler_arguments);
+        let Some(standard) = self.cpp_standard.argument() else {
+            return arguments;
+        };
+        arguments
+            .into_iter()
+            .filter(|argument| !argument.starts_with("-std=") && !argument.starts_with("--std="))
+            .chain([standard])
+            .collect()
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct DocumentMetadata {
+    #[serde(default)]
+    pub problem: Option<crate::problem::Problem>,
     pub problem_url: Option<String>,
     pub problem_title: Option<String>,
     pub tests: Vec<TestCase>,
@@ -62,6 +90,12 @@ pub struct CodeDocument {
 }
 
 impl CodeDocument {
+    pub fn from_problem(problem: crate::problem::Problem, settings: DocumentSettings) -> Self {
+        let mut document = Self::untitled_with_settings(settings);
+        document.metadata.tests = problem.samples.clone();
+        document.metadata.problem = Some(problem);
+        document
+    }
     pub fn untitled() -> Self {
         Self::untitled_with_settings(DocumentSettings::default())
     }
@@ -90,8 +124,63 @@ impl CodeDocument {
     pub fn fork(&self, path: PathBuf) -> Self {
         let mut copy = self.clone();
         copy.id = DocumentId(Uuid::new_v4());
+        copy.metadata.problem = self
+            .metadata
+            .problem
+            .as_ref()
+            .map(|problem| problem.independent_copy());
+        if let Some(previous) = self.path.as_ref().and_then(|path| path.parent()) {
+            let checker_path = match &mut copy.metadata.settings.execution.checker {
+                crate::checker::Checker::Executable(checker) => Some(&mut checker.program),
+                _ => None,
+            };
+            for file in copy
+                .metadata
+                .tests
+                .iter_mut()
+                .flat_map(|test| {
+                    [&mut test.input_file, &mut test.expected_file]
+                        .into_iter()
+                        .flatten()
+                })
+                .chain(checker_path)
+            {
+                if file.is_relative() {
+                    let absolute = previous.join(&*file);
+                    *file = path
+                        .parent()
+                        .and_then(|parent| absolute.strip_prefix(parent).ok())
+                        .map(PathBuf::from)
+                        .unwrap_or(absolute);
+                }
+            }
+        }
         copy.path = Some(path);
         copy
+    }
+    /// Attachments follow the source directory; unsaved documents use their
+    /// explicit working directory, then the IDE's current directory.
+    pub fn resolve_attachment_path(&self, path: &Path) -> anyhow::Result<PathBuf> {
+        if path.is_absolute() {
+            return Ok(path.to_owned());
+        }
+        let base = self
+            .path
+            .as_deref()
+            .and_then(Path::parent)
+            .or(self.metadata.settings.working_directory.as_deref())
+            .map(Path::to_owned)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)?;
+        Ok(base.join(path))
+    }
+    pub fn stored_attachment_path(&self, absolute: &Path) -> PathBuf {
+        self.path
+            .as_deref()
+            .and_then(Path::parent)
+            .and_then(|parent| absolute.strip_prefix(parent).ok())
+            .map(Path::to_owned)
+            .unwrap_or_else(|| absolute.to_owned())
     }
     pub fn untitled_number(&self) -> Option<u64> {
         self.untitled_number

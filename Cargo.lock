@@ -119,9 +119,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64",
+ "httparse",
+ "imara-diff",
  "libc",
  "serde",
  "serde_json",
+ "url",
  "uuid",
 ]
 
